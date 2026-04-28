@@ -1,7 +1,7 @@
-"""Gitea Miscellaneous API tools.
+"""Gitea 杂项 API 工具。
 
-Covers: version info, markdown rendering, server status.
-Ref: https://gitea.com/api/swagger#/miscellaneous
+涵盖：版本信息、Markdown 渲染、服务器状态。
+参考：https://gitea.com/api/swagger#/miscellaneous
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def get_signing_key() -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Export
+# 导出
 # ---------------------------------------------------------------------------
 
 all_tools: list = [

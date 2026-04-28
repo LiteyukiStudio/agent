@@ -1,0 +1,85 @@
+# LiteYuki SRE Agent - Docker Compose 示例
+#
+# 快速启动：
+#   cp .env.example .env    # 复制并修改配置
+#   docker compose up -d    # 启动服务
+#
+# 默认使用 SQLite，如需 PostgreSQL 取消注释 postgres 部分。
+
+services:
+  # --------------------------------------------------------------------------
+  # 后端 API + Agent
+  # --------------------------------------------------------------------------
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # ---- 必填 ----
+      SECRET_KEY: ${SECRET_KEY:?请设置 SECRET_KEY}
+      SERVER_HOST: ${SERVER_HOST:-http://localhost}
+
+      # ---- 数据库 ----
+      # SQLite（默认，数据持久化到 volume）
+      DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:///./data/data.db}
+      # PostgreSQL（取消注释并注释掉上面的 SQLite）
+      # DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-liteyuki}:${POSTGRES_PASSWORD:-liteyuki}@postgres:5432/${POSTGRES_DB:-liteyuki_sre}
+
+      # ---- 初始管理员 ----
+      INITIAL_USERNAME: ${INITIAL_USERNAME:-admin}
+      INITIAL_PASSWORD: ${INITIAL_PASSWORD:-admin}
+
+      # ---- LLM 模型 ----
+      AGENT_MODEL: ${AGENT_MODEL:-deepseek/deepseek-v4-flash}
+      AGENT_TOKEN: ${AGENT_TOKEN:-}
+      AGENT_API: ${AGENT_API:-https://api.deepseek.com}
+
+      # ---- CORS ----
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost,http://localhost:80}
+
+    volumes:
+      # SQLite 数据持久化
+      - backend-data:/app/data
+    restart: unless-stopped
+    # depends_on:
+    #   postgres:
+    #     condition: service_healthy
+
+  # --------------------------------------------------------------------------
+  # 前端（Nginx 托管 + API 反代）
+  # --------------------------------------------------------------------------
+  frontend:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # PostgreSQL（可选，取消注释启用）
+  # --------------------------------------------------------------------------
+  # postgres:
+  #   image: postgres:17-alpine
+  #   environment:
+  #     POSTGRES_USER: ${POSTGRES_USER:-liteyuki}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-liteyuki}
+  #     POSTGRES_DB: ${POSTGRES_DB:-liteyuki_sre}
+  #   volumes:
+  #     - postgres-data:/var/lib/postgresql/data
+  #   ports:
+  #     - "5432:5432"
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-liteyuki}"]
+  #     interval: 5s
+  #     timeout: 3s
+  #     retries: 5
+  #   restart: unless-stopped
+
+volumes:
+  backend-data:
+  # postgres-data:

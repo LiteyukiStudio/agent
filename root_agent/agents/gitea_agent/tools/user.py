@@ -1,7 +1,7 @@
-"""Gitea User API tools.
+"""Gitea 用户 API 工具。
 
-Covers: current user, user lookup, repos, orgs, followers/following.
-Ref: https://gitea.com/api/swagger#/user
+涵盖：当前用户、用户查询、仓库、组织、关注者/正在关注。
+参考：https://gitea.com/api/swagger#/user
 """
 
 from __future__ import annotations
@@ -85,7 +85,7 @@ def list_following(username: str, page: int = 1, limit: int = 20) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Export
+# 导出
 # ---------------------------------------------------------------------------
 
 all_tools: list = [

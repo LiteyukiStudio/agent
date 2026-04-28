@@ -1,0 +1,10 @@
+{
+  "newChat": "新建对话",
+  "placeholder": "输入消息，Enter 发送，Shift+Enter 换行",
+  "send": "发送",
+  "noMessages": "发送一条消息开始对话",
+  "selectSession": "选择一个会话或创建新会话以开始",
+  "noSessionMessages": "暂无消息",
+  "toolCall": "工具调用",
+  "thinking": "思考中..."
+}

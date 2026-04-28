@@ -1,4 +1,4 @@
-"""Chat session and messaging routes."""
+"""聊天会话和消息路由。"""
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ async def list_sessions(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[SessionResponse]:
-    """List all chat sessions for the current user."""
+    """列出当前用户的所有聊天会话。"""
     sessions = await chat_service.list_sessions(db, user.id)
     return [SessionResponse.model_validate(s) for s in sessions]
 
@@ -35,7 +35,7 @@ async def create_session(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SessionResponse:
-    """Create a new chat session."""
+    """创建新的聊天会话。"""
     session = await chat_service.create_session(db, user.id, body.title)
     return SessionResponse.model_validate(session)
 
@@ -46,7 +46,7 @@ async def delete_session(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    """Delete a chat session."""
+    """删除聊天会话。"""
     deleted = await chat_service.delete_session(db, user.id, session_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
@@ -59,8 +59,8 @@ async def send_message(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
-    """Send a message and stream the agent response via SSE."""
-    # Verify session ownership
+    """发送消息并通过 SSE 流式返回 Agent 响应。"""
+    # 验证会话所有权
     sessions = await chat_service.list_sessions(db, user.id)
     chat_session = next((s for s in sessions if s.id == session_id), None)
     if chat_session is None:

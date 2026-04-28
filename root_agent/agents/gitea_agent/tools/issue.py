@@ -1,7 +1,7 @@
-"""Gitea Issue API tools.
+"""Gitea Issue API 工具。
 
-Covers: list issues, get/create/edit issue, comments, labels.
-Ref: https://gitea.com/api/swagger#/issue
+涵盖：列出 Issue、获取/创建/编辑 Issue、评论、标签。
+参考：https://gitea.com/api/swagger#/issue
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from ..client import GiteaClient
 
 # ---------------------------------------------------------------------------
-# Issues
+# Issue
 # ---------------------------------------------------------------------------
 
 
@@ -121,7 +121,7 @@ def edit_issue(
 
 
 # ---------------------------------------------------------------------------
-# Comments
+# 评论
 # ---------------------------------------------------------------------------
 
 
@@ -153,7 +153,7 @@ def create_issue_comment(owner: str, repo: str, index: int, body: str) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Labels
+# 标签
 # ---------------------------------------------------------------------------
 
 
@@ -196,7 +196,7 @@ def remove_issue_label(owner: str, repo: str, index: int, label_id: int) -> dict
 
 
 # ---------------------------------------------------------------------------
-# Export
+# 导出
 # ---------------------------------------------------------------------------
 
 all_tools: list = [

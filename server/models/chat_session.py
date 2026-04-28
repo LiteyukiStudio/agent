@@ -1,4 +1,4 @@
-"""ChatSession ORM model."""
+"""聊天会话 ORM 模型。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from server.database import Base
 
 
 class ChatSession(Base):
-    """A chat session belonging to a user, linked to an ADK session."""
+    """属于某用户的聊天会话，关联到 ADK session。"""
 
     __tablename__ = "chat_sessions"
 

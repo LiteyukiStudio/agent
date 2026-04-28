@@ -1,4 +1,4 @@
-"""Application configuration loaded from environment variables."""
+"""应用配置，从环境变量加载。"""
 
 from __future__ import annotations
 
@@ -6,8 +6,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
-# Load .env from root_agent/.env if dotenv is available
-_env_path = Path(__file__).resolve().parent.parent / "root_agent" / ".env"
+# 加载项目根目录 .env（开发环境用，容器化部署直接注入环境变量）
+_env_path = Path(__file__).resolve().parent.parent / ".env"
 if _env_path.exists():
     for line in _env_path.read_text().splitlines():
         line = line.strip()
@@ -21,7 +21,7 @@ if _env_path.exists():
 
 @dataclass
 class Settings:
-    """Server settings resolved from environment variables."""
+    """从环境变量解析的服务器配置。"""
 
     database_url: str = field(
         default_factory=lambda: os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data.db"),
@@ -37,6 +37,14 @@ class Settings:
     )
     jwt_algorithm: str = "HS256"
     jwt_expire_hours: int = 24
+
+    # 初始超级用户账号（首次启动自动创建）
+    initial_username: str = field(
+        default_factory=lambda: os.getenv("INITIAL_USERNAME", "admin"),
+    )
+    initial_password: str = field(
+        default_factory=lambda: os.getenv("INITIAL_PASSWORD", "admin"),
+    )
 
 
 settings = Settings()

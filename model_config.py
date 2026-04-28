@@ -1,33 +1,32 @@
-"""Centralized model configuration.
+"""统一模型配置。
 
-Resolves which LLM model each agent should use.
+解析每个 Agent 应使用的 LLM 模型。
 
-Priority (per parameter, independently):
-    1. Agent-specific env var:  {AGENT_NAME}_MODEL / {AGENT_NAME}_TOKEN / {AGENT_NAME}_API
-    2. Global env var:          AGENT_MODEL / AGENT_TOKEN / AGENT_API
-    3. Hardcoded fallback:      gemini-2.5-flash (native Gemini, no LiteLLM needed)
+优先级（每个参数独立回退）：
+    1. Agent 级环境变量：{AGENT_NAME}_MODEL / {AGENT_NAME}_TOKEN / {AGENT_NAME}_API
+    2. 全局环境变量：    AGENT_MODEL / AGENT_TOKEN / AGENT_API
+    3. 硬编码兜底：      gemini-2.5-flash（原生 Gemini，无需 LiteLLM）
 
-Each parameter falls back independently, so you can set the model globally
-but override only the token for a specific agent.
+每个参数独立回退，可以全局设模型但为某个 Agent 单独覆盖 Token。
 
-For non-Gemini models (DeepSeek, OpenAI, Ollama, etc.), the function returns a LiteLlm
-wrapper automatically. For Gemini models, it returns the plain model string.
+非 Gemini 模型（DeepSeek、OpenAI、Ollama 等）自动通过 LiteLlm 适配器返回。
+Gemini 模型直接返回模型名字符串。
 
-## .env example
+## .env 示例
 
-    # --- Global defaults (all agents use this unless overridden) ---
+    # --- 全局默认（所有 Agent 使用，除非被覆盖）---
     AGENT_MODEL=deepseek/deepseek-chat
     AGENT_TOKEN=sk-xxxxxxxxxxxxxxxx
     AGENT_API=https://api.deepseek.com
 
-    # --- Per-agent overrides (optional) ---
+    # --- Agent 级覆盖（可选）---
     ROOT_AGENT_MODEL=gemini-2.5-flash
-    # ROOT_AGENT_TOKEN=              # falls back to AGENT_TOKEN
-    # ROOT_AGENT_API=                # falls back to AGENT_API
+    # ROOT_AGENT_TOKEN=              # 回退到 AGENT_TOKEN
+    # ROOT_AGENT_API=                # 回退到 AGENT_API
 
     GITEA_AGENT_MODEL=deepseek/deepseek-chat
     GITEA_AGENT_TOKEN=sk-yyyyyyyyyy
-    # GITEA_AGENT_API=               # falls back to AGENT_API
+    # GITEA_AGENT_API=               # 回退到 AGENT_API
 """
 
 from __future__ import annotations
@@ -37,51 +36,51 @@ from typing import Any
 
 
 def _resolve_env(agent_prefix: str, param: str) -> str:
-    """Resolve a single config parameter with agent → global fallback.
+    """解析单个配置参数，按 Agent 级 → 全局 顺序回退。
 
-    Lookup order:
-        1. {AGENT_PREFIX}_{PARAM}   e.g. GITEA_AGENT_MODEL
-        2. AGENT_{PARAM}            e.g. AGENT_MODEL
+    查找顺序：
+        1. {AGENT_PREFIX}_{PARAM}   例如 GITEA_AGENT_MODEL
+        2. AGENT_{PARAM}            例如 AGENT_MODEL
     """
-    # Agent-specific
+    # Agent 级
     value = os.getenv(f"{agent_prefix}_{param}", "")
     if value:
         return value
-    # Global fallback
+    # 全局回退
     return os.getenv(f"AGENT_{param}", "")
 
 
 def _is_gemini(model_name: str) -> bool:
-    """Check if a model string refers to a native Gemini model."""
+    """检查模型名是否为原生 Gemini 模型。"""
     return model_name.startswith("gemini")
 
 
 def get_model(agent_name: str) -> Any:
-    """Return the model object for a given agent.
+    """返回指定 Agent 的模型对象。
 
     Args:
-        agent_name: The agent's name, e.g. "root_agent" or "gitea_agent".
-                    Used to derive the env var prefix (uppercased, hyphens to underscores).
+        agent_name: Agent 名称，例如 "root_agent" 或 "gitea_agent"。
+                    用于推导环境变量前缀（大写，连字符转下划线）。
 
     Returns:
-        Either a plain model string (for Gemini) or a LiteLlm instance (for everything else).
+        Gemini 模型返回字符串，其他模型返回 LiteLlm 实例。
     """
     prefix = agent_name.upper().replace("-", "_")
 
-    # Each parameter falls back independently
+    # 每个参数独立回退
     model_name = _resolve_env(prefix, "MODEL")
     token = _resolve_env(prefix, "TOKEN")
     api_url = _resolve_env(prefix, "API")
 
-    # Hardcoded fallback
+    # 硬编码兜底
     if not model_name:
         model_name = "gemini-2.5-flash"
 
-    # Gemini models are used natively — just return the string
+    # Gemini 模型原生使用，直接返回字符串
     if _is_gemini(model_name):
         return model_name
 
-    # Non-Gemini models go through LiteLLM adapter
+    # 非 Gemini 模型通过 LiteLLM 适配器
     from google.adk.models.lite_llm import LiteLlm
 
     kwargs: dict[str, str] = {"model": model_name}

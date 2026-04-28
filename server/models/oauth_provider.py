@@ -1,4 +1,4 @@
-"""OAuthProvider ORM model."""
+"""OAuth 提供商 ORM 模型。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from server.database import Base
 
 
 class OAuthProvider(Base):
-    """OAuth / OIDC provider configuration."""
+    """OAuth / OIDC 提供商配置。"""
 
     __tablename__ = "oauth_providers"
 
@@ -23,7 +23,10 @@ class OAuthProvider(Base):
     client_secret: Mapped[str] = mapped_column(String(500), nullable=False)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
 
-    # Auto-filled by OIDC discovery
+    # 访问控制：whitelist（默认，仅名单内允许）或 blacklist（名单内禁止）
+    access_mode: Mapped[str] = mapped_column(String(20), default="whitelist")
+
+    # 由 OIDC 发现端点自动填充
     authorization_endpoint: Mapped[str | None] = mapped_column(String(500), nullable=True)
     token_endpoint: Mapped[str | None] = mapped_column(String(500), nullable=True)
     userinfo_endpoint: Mapped[str | None] = mapped_column(String(500), nullable=True)

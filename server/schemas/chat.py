@@ -1,4 +1,4 @@
-"""Chat-related Pydantic schemas."""
+"""聊天相关的 Pydantic 数据模型。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 
 class SessionResponse(BaseModel):
-    """Chat session summary."""
+    """聊天会话摘要。"""
 
     id: str
     title: str
@@ -19,19 +19,19 @@ class SessionResponse(BaseModel):
 
 
 class SessionCreate(BaseModel):
-    """Request body for creating a new chat session."""
+    """创建新聊天会话的请求体。"""
 
     title: str = "New Chat"
 
 
 class MessageSend(BaseModel):
-    """Request body for sending a message to the agent."""
+    """向 Agent 发送消息的请求体。"""
 
     content: str
 
 
 class MessageEvent(BaseModel):
-    """A single SSE event from the agent response stream."""
+    """Agent 响应流中的单个 SSE 事件。"""
 
     event: str  # 'text', 'tool_call', 'done', 'error'
     data: str

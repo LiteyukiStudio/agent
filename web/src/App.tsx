@@ -1,64 +1,53 @@
-import { useState } from 'react'
-import { Menu } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { Sidebar } from '@/components/chat/Sidebar'
-import { ChatArea } from '@/components/chat/ChatArea'
-import { useChat } from '@/hooks/useChat'
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import { ProtectedRoute } from '@/components/ProtectedRoute'
+import { LoginPage } from '@/pages/LoginPage'
+import { ChatPage } from '@/pages/ChatPage'
+import { SettingsPage } from '@/pages/SettingsPage'
+import { AdminLayout } from '@/pages/admin/AdminLayout'
+import { UsersPage } from '@/pages/admin/UsersPage'
+import { OAuthPage } from '@/pages/admin/OAuthPage'
+import { QuotaPage } from '@/pages/admin/QuotaPage'
 
 export default function App() {
-  const { sessions, activeSession, isLoading, setActiveSession, createSession, sendMessage } = useChat()
-  const [mobileOpen, setMobileOpen] = useState(false)
-
-  const sidebarContent = (
-    <Sidebar
-      sessions={sessions}
-      activeSessionId={activeSession?.id ?? null}
-      onSelectSession={(id) => {
-        setActiveSession(id)
-        setMobileOpen(false)
-      }}
-      onNewSession={() => {
-        createSession()
-        setMobileOpen(false)
-      }}
-    />
-  )
-
   return (
-    <div className="flex h-dvh overflow-hidden bg-background">
-      {/* Desktop sidebar */}
-      <div className="hidden md:block">
-        {sidebarContent}
-      </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/login" element={<LoginPage />} />
 
-      {/* Mobile sidebar */}
-      <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-        <SheetTrigger
-          render={
-            <Button
-              variant="ghost"
-              size="icon"
-              className="fixed top-3 left-3 z-40 md:hidden"
-            />
-          }
-        >
-          <Menu className="size-5" />
-        </SheetTrigger>
-        <SheetContent side="left" className="w-[280px] p-0">
-          <SheetTitle className="sr-only">Navigation</SheetTitle>
-          {sidebarContent}
-        </SheetContent>
-      </Sheet>
-
-      {/* Main chat area */}
-      <div className="flex flex-1 flex-col overflow-hidden">
-        <ChatArea
-          session={activeSession}
-          isLoading={isLoading}
-          onSend={sendMessage}
+        <Route
+          path="/"
+          element={(
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          )}
         />
-      </div>
-    </div>
+
+        <Route
+          path="/settings"
+          element={(
+            <ProtectedRoute>
+              <SettingsPage />
+            </ProtectedRoute>
+          )}
+        />
+
+        <Route
+          path="/admin"
+          element={(
+            <ProtectedRoute requireAdmin>
+              <AdminLayout />
+            </ProtectedRoute>
+          )}
+        >
+          <Route index element={<Navigate to="/admin/users" replace />} />
+          <Route path="users" element={<UsersPage />} />
+          <Route path="oauth" element={<OAuthPage />} />
+          <Route path="quota" element={<QuotaPage />} />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   )
 }

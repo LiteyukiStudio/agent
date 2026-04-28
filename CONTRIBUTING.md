@@ -9,6 +9,7 @@
 - 字符串统一用**单引号**（Python / TypeScript 均适用）
 - 提交信息遵循 [Conventional Commits](https://www.conventionalcommits.org/)：`feat:` / `fix:` / `refactor:` / `docs:` / `chore:`
 - 不提交 `.env`、`.credentials.json`、`node_modules`、`__pycache__` 等敏感或生成文件
+- **注释语言**：Python 代码的注释、模块 docstring、行内注释、段落标题统一用**中文**。工具函数的 docstring（`tools/*.py`）保持当前语言以确保 LLM 工具识别准确。TypeScript 注释保持英文。
 
 ## Python
 
@@ -27,6 +28,10 @@
 - 优先 `pathlib.Path` 而非 `os.path`
 - 禁止遗留 `print()`（tools 目录除外，调试用）
 - import 顺序：stdlib → 第三方 → 本项目（isort 自动处理）
+- **导入风格**：包内用相对导入，跨包用绝对导入
+  - 包内：`from .tools import all_tools`、`from ..client import GiteaClient`
+  - 跨包：`from server.config import settings`、`from model_config import get_model`
+  - 同一个包内保持一致，不混用
 
 ### ADK Agent 规范
 
@@ -100,6 +105,19 @@ web/src/
 - 用 TailwindCSS class，不写自定义 CSS（除 `index.css` 的 CSS 变量）
 - shadcn/ui 组件目录 `components/ui/` 由 CLI 生成，**不要手动修改**
 - 颜色使用 CSS 变量（`bg-background`、`text-foreground`），不硬编码色值
+
+### 图标
+
+- 统一使用 **lucide-react** 图标库：`import { IconName } from 'lucide-react'`
+- 菜单项、按钮等交互元素**必须搭配图标**，提升可识别性
+- 图标尺寸：跟随文本用 `size-4`（16px），独立按钮用 `size-5`（20px）
+- 不要混用其他图标库（heroicons、phosphor 等）
+
+### i18n
+
+- 所有面向用户的文案走 i18n：`const { t } = useTranslation('namespace')`
+- 翻译文件：`src/locales/{zh,en,ja}/{module}.json`，按模块拆分一层
+- 不在组件里硬编码中文/英文字符串
 
 ### 检查命令
 

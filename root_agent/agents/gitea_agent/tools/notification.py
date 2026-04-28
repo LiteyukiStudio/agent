@@ -1,7 +1,7 @@
-"""Gitea Notification API tools.
+"""Gitea 通知 API 工具。
 
-Covers: list notifications, mark read.
-Ref: https://gitea.com/api/swagger#/notification
+涵盖：列出通知、标记已读。
+参考：https://gitea.com/api/swagger#/notification
 """
 
 from __future__ import annotations
@@ -42,7 +42,7 @@ def mark_notification_read(notification_id: int) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Export
+# 导出
 # ---------------------------------------------------------------------------
 
 all_tools: list = [

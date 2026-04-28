@@ -1,5 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import { useCallback, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ArrowUp, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -11,6 +12,8 @@ interface ChatInputProps {
 }
 
 export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
+  const { t } = useTranslation('chat')
+  const { t: tc } = useTranslation('common')
   const [value, setValue] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -19,7 +22,6 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
       return
     onSend(value)
     setValue('')
-    // Reset textarea height
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto'
     }
@@ -44,7 +46,7 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
             value={value}
             onChange={e => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message... (Shift+Enter for newline)"
+            placeholder={t('placeholder')}
             className="min-h-[44px] max-h-[200px] resize-none pr-4 text-sm"
             rows={1}
             disabled={disabled}
@@ -65,7 +67,7 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
         </Button>
       </div>
       <p className="mx-auto mt-2 max-w-3xl text-center text-[11px] text-muted-foreground">
-        LiteYuki SRE Agent may make mistakes. Verify important operations.
+        {tc('disclaimer')}
       </p>
     </div>
   )

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Bot } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MessageBubble } from '@/components/chat/MessageBubble'
@@ -12,6 +13,8 @@ interface ChatAreaProps {
 }
 
 export function ChatArea({ session, isLoading, onSend }: ChatAreaProps) {
+  const { t } = useTranslation('chat')
+  const { t: tc } = useTranslation('common')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -25,8 +28,8 @@ export function ChatArea({ session, isLoading, onSend }: ChatAreaProps) {
           <Bot className="size-8" />
         </div>
         <div className="text-center">
-          <h2 className="text-lg font-medium text-foreground">Liteyuki Agent</h2>
-          <p className="mt-1 text-sm">Select a session or create a new one to get started</p>
+          <h2 className="text-lg font-medium text-foreground">{tc('appName')}</h2>
+          <p className="mt-1 text-sm">{t('selectSession')}</p>
         </div>
       </div>
     )
@@ -45,7 +48,7 @@ export function ChatArea({ session, isLoading, onSend }: ChatAreaProps) {
           {session.messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <Bot className="mb-3 size-10" />
-              <p className="text-sm">Send a message to start the conversation</p>
+              <p className="text-sm">{t('noMessages')}</p>
             </div>
           )}
           {session.messages.map(msg => (

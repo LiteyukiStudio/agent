@@ -1,2 +1,2 @@
 # root_agent/__init__.py
-# ADK requires agent.py — this file intentionally left minimal.
+# ADK 要求 agent.py 文件存在，此文件保持最简。

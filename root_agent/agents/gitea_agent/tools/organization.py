@@ -1,7 +1,7 @@
-"""Gitea Organization API tools.
+"""Gitea 组织 API 工具。
 
-Covers: list/get orgs, org repos, members, teams.
-Ref: https://gitea.com/api/swagger#/organization
+涵盖：列出/获取组织、组织仓库、成员、团队。
+参考：https://gitea.com/api/swagger#/organization
 """
 
 from __future__ import annotations
@@ -101,7 +101,7 @@ def list_team_repos(team_id: int, page: int = 1, limit: int = 20) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Export
+# 导出
 # ---------------------------------------------------------------------------
 
 all_tools: list = [

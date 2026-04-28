@@ -1,7 +1,7 @@
-"""Gitea Repository & Pull Request API tools.
+"""Gitea 仓库与 Pull Request API 工具。
 
-Covers: repos CRUD, branches, releases, pull requests.
-Ref: https://gitea.com/api/swagger#/repository
+涵盖：仓库 CRUD、分支、Release、Pull Request。
+参考：https://gitea.com/api/swagger#/repository
 """
 
 from __future__ import annotations
@@ -9,7 +9,7 @@ from __future__ import annotations
 from ..client import GiteaClient
 
 # ---------------------------------------------------------------------------
-# Repositories
+# 仓库
 # ---------------------------------------------------------------------------
 
 
@@ -136,7 +136,7 @@ def list_releases(owner: str, repo: str, page: int = 1, limit: int = 10) -> dict
 
 
 # ---------------------------------------------------------------------------
-# Pull Requests
+# Pull Request
 # ---------------------------------------------------------------------------
 
 
@@ -248,11 +248,11 @@ def list_pr_commits(owner: str, repo: str, index: int, page: int = 1, limit: int
 
 
 # ---------------------------------------------------------------------------
-# Export
+# 导出
 # ---------------------------------------------------------------------------
 
 all_tools: list = [
-    # Repos
+    # 仓库
     search_repos,
     get_repo,
     create_repo,
@@ -260,7 +260,7 @@ all_tools: list = [
     list_branches,
     get_file_content,
     list_releases,
-    # Pull Requests
+    # Pull Request
     list_pull_requests,
     get_pull_request,
     create_pull_request,

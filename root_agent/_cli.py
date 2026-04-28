@@ -1,43 +1,43 @@
-"""CLI entry points for uv run <command>."""
+"""uv run <command> 的 CLI 入口点。"""
 
 import subprocess
 import sys
 
 
 def dev() -> None:
-    """Run the root agent interactively (adk run root_agent)."""
+    """以交互模式启动 root agent（adk run root_agent）。"""
     sys.exit(subprocess.call(["adk", "run", "root_agent"]))
 
 
 def web() -> None:
-    """Run the root agent with web UI (adk web root_agent)."""
+    """以 Web UI 模式启动 root agent（adk web root_agent）。"""
     sys.exit(subprocess.call(["adk", "web", "root_agent"]))
 
 
 def lint() -> None:
-    """Run ruff linter on the project."""
+    """运行 Ruff 代码检查。"""
     sys.exit(subprocess.call(["ruff", "check", "."]))
 
 
 def fmt() -> None:
-    """Run ruff formatter on the project."""
+    """运行 Ruff 代码格式化。"""
     sys.exit(subprocess.call(["ruff", "format", "."]))
 
 
 def fix() -> None:
-    """Run ruff with auto-fix (lint + format)."""
+    """自动修复 lint 问题并格式化。"""
     ret = subprocess.call(["ruff", "check", "--fix", "."])
     ret2 = subprocess.call(["ruff", "format", "."])
     sys.exit(ret or ret2)
 
 
 def check() -> None:
-    """Run all checks: lint + format check."""
+    """运行所有检查：lint + 格式检查（不修改文件）。"""
     ret = subprocess.call(["ruff", "check", "."])
     ret2 = subprocess.call(["ruff", "format", "--check", "."])
     sys.exit(ret or ret2)
 
 
 def server() -> None:
-    """Start the FastAPI backend server."""
+    """启动 FastAPI 后端服务器。"""
     sys.exit(subprocess.call(["uvicorn", "server.main:app", "--reload", "--port", "8000"]))

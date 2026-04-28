@@ -1,0 +1,21 @@
+{
+  "title": "設定",
+  "apiTokens": "API トークン",
+  "createToken": "トークン作成",
+  "tokenName": "トークン名",
+  "tokenNamePlaceholder": "例: CI Pipeline",
+  "tokenScopes": "スコープ",
+  "tokenCreated": "トークンが作成されました！今すぐコピーしてください。再表示されません：",
+  "revoke": "取り消し",
+  "noTokens": "API トークンはまだありません。",
+  "usage": "使用量",
+  "plan": "プラン",
+  "daily": "今日",
+  "weekly": "今週",
+  "monthly": "今月",
+  "used": "使用済み",
+  "remaining": "残り",
+  "settings": "設定",
+  "logout": "ログアウト",
+  "admin": "管理"
+}

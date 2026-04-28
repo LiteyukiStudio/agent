@@ -15,6 +15,7 @@ dependencies = [
     "asyncpg>=0.30",
     "authlib>=1.5",
     "python-jose[cryptography]>=3.3",
+    "bcrypt>=4.2",
 ]
 
 [dependency-groups]
@@ -39,7 +40,7 @@ check = "root_agent._cli:check"
 server = "root_agent._cli:server"
 
 # ---------------------------------------------------------------------------
-# Ruff
+# Ruff 代码检查
 # ---------------------------------------------------------------------------
 [tool.ruff]
 target-version = "py313"
@@ -47,29 +48,29 @@ line-length = 120
 
 [tool.ruff.lint]
 select = [
-    "F",      # pyflakes — unused imports, undefined names, etc.
-    "E",      # pycodestyle errors
-    "W",      # pycodestyle warnings
-    "I",      # isort — import sorting
-    "N",      # pep8-naming
-    "UP",     # pyupgrade — modern Python syntax
-    "B",      # flake8-bugbear — common pitfalls
-    "A",      # flake8-builtins — shadowing builtins
-    "T20",    # flake8-print — no stray print()
-    "SIM",    # flake8-simplify — simplifiable constructs
-    "TC",     # flake8-type-checking — TYPE_CHECKING imports
-    "RUF",    # ruff-specific rules
-    "ANN",    # flake8-annotations — enforce type annotations
-    "C4",     # flake8-comprehensions
-    "PIE",    # flake8-pie — misc lints
-    "RET",    # flake8-return — return consistency
-    "PTH",    # flake8-use-pathlib
+    "F",      # pyflakes — 未使用导入、未定义变量等
+    "E",      # pycodestyle 错误
+    "W",      # pycodestyle 警告
+    "I",      # isort — 导入排序
+    "N",      # pep8-naming — 命名规范
+    "UP",     # pyupgrade — 现代 Python 语法
+    "B",      # flake8-bugbear — 常见陷阱
+    "A",      # flake8-builtins — 内置名称遮蔽
+    "T20",    # flake8-print — 禁止遗留 print()
+    "SIM",    # flake8-simplify — 可简化表达式
+    "TC",     # flake8-type-checking — TYPE_CHECKING 导入
+    "RUF",    # ruff 专有规则
+    "ANN",    # flake8-annotations — 强制类型注解
+    "C4",     # flake8-comprehensions — 推导式优化
+    "PIE",    # flake8-pie — 杂项检查
+    "RET",    # flake8-return — 返回值一致性
+    "PTH",    # flake8-use-pathlib — 优先 pathlib
 ]
 ignore = [
-    "ANN401",  # typing.Any disallowed — too strict for API wrappers
-    "RUF001",  # ambiguous unicode — false positives on Chinese text in instructions/descriptions
-    "RUF002",  # ambiguous unicode in docstrings
-    "RUF003",  # ambiguous unicode in comments
+    "ANN401",  # 禁止 typing.Any — 对 API 包装层过严
+    "RUF001",  # 歧义 unicode — 中文文本误报
+    "RUF002",  # 歧义 unicode（docstring 中）
+    "RUF003",  # 歧义 unicode（注释中）
 ]
 
 [tool.ruff.lint.isort]
@@ -78,9 +79,9 @@ force-single-line = false
 combine-as-imports = true
 
 [tool.ruff.lint.per-file-ignores]
-"**/tools/*.py" = ["T20", "TC"]   # allow print(); ADK needs runtime type annotations for ToolContext injection
-"**/__init__.py" = ["F401"]       # allow unused imports in __init__.py (re-exports)
-"server/routers/*.py" = ["B008"]  # FastAPI Depends() in defaults is idiomatic
-"server/deps.py" = ["B008"]       # FastAPI Depends() in defaults is idiomatic
-"server/models/*.py" = ["TC003"]  # SQLAlchemy mapped columns need runtime datetime
-"server/schemas/*.py" = ["TC003"] # Pydantic models need runtime datetime
+"**/tools/*.py" = ["T20", "TC"]   # 允许 print()；ADK 需要运行时类型注解注入 ToolContext
+"**/__init__.py" = ["F401"]       # 允许未使用导入（re-export）
+"server/routers/*.py" = ["B008"]  # FastAPI Depends() 默认参数是惯用写法
+"server/deps.py" = ["B008"]       # FastAPI Depends() 默认参数是惯用写法
+"server/models/*.py" = ["TC003"]  # SQLAlchemy 映射列需要运行时 datetime
+"server/schemas/*.py" = ["TC003"] # Pydantic 模型需要运行时 datetime

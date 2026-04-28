@@ -1,175 +1,228 @@
-import { useCallback, useState } from 'react'
-import type { ChatState, Message, Session, ToolCall } from '@/types/chat'
+import { useCallback, useEffect, useState } from 'react'
+import { apiDelete, apiGet, apiPost, streamSSE } from '@/lib/api'
+import type { Message, Session, ToolCall } from '@/types/chat'
 
-const MOCK_TOOL_CALLS: ToolCall[] = [
-  {
-    id: 'tc-1',
-    name: 'show_gitea_config',
-    args: {},
-    result: JSON.stringify({ configured: true, base_url: 'https://git.liteyuki.icu', has_token: true, sources: ['file'] }, null, 2),
-    status: 'completed',
-  },
-  {
-    id: 'tc-2',
-    name: 'list_repo_issues',
-    args: { owner: 'liteyuki', repo: 'liteyuki-bot', state: 'open', limit: 10 },
-    result: JSON.stringify([
-      { number: 42, title: 'Fix memory leak in plugin loader', state: 'open', labels: ['bug'] },
-      { number: 38, title: 'Add i18n support for error messages', state: 'open', labels: ['enhancement'] },
-      { number: 35, title: 'Update dependency versions', state: 'open', labels: ['maintenance'] },
-    ], null, 2),
-    status: 'completed',
-  },
-]
-
-const MOCK_SESSIONS: Session[] = [
-  {
-    id: 's-1',
-    title: 'Gitea Issue Review',
-    lastMessage: 'Found 3 open issues in liteyuki-bot',
-    updatedAt: new Date(Date.now() - 1000 * 60 * 5),
-    messages: [
-      {
-        id: 'm-1',
-        role: 'user',
-        content: 'Please check the open issues in the liteyuki-bot repo on Gitea',
-        timestamp: new Date(Date.now() - 1000 * 60 * 10),
-      },
-      {
-        id: 'm-2',
-        role: 'assistant',
-        content: 'Let me check the Gitea configuration and fetch the open issues for you.',
-        timestamp: new Date(Date.now() - 1000 * 60 * 9),
-        toolCalls: MOCK_TOOL_CALLS,
-      },
-      {
-        id: 'm-3',
-        role: 'assistant',
-        content: `I found **3 open issues** in the \`liteyuki/liteyuki-bot\` repository:\n\n| # | Title | Labels |\n|---|-------|--------|\n| #42 | Fix memory leak in plugin loader | \`bug\` |\n| #38 | Add i18n support for error messages | \`enhancement\` |\n| #35 | Update dependency versions | \`maintenance\` |\n\nWould you like me to take any action on these issues? For example, I can:\n- Add comments\n- Assign someone\n- Close resolved ones`,
-        timestamp: new Date(Date.now() - 1000 * 60 * 8),
-      },
-    ],
-  },
-  {
-    id: 's-2',
-    title: 'Deploy Status Check',
-    lastMessage: 'All services are running normally',
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 2),
-    messages: [
-      {
-        id: 'm-4',
-        role: 'user',
-        content: 'What is the current status of all our services?',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2),
-      },
-      {
-        id: 'm-5',
-        role: 'assistant',
-        content: 'All services are running normally. The Gitea instance at `git.liteyuki.icu` is online and responsive.',
-        timestamp: new Date(Date.now() - 1000 * 60 * 60 * 2 + 5000),
-      },
-    ],
-  },
-  {
-    id: 's-3',
-    title: 'New Repo Setup',
-    lastMessage: 'Repository created successfully',
-    updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24),
-    messages: [],
-  },
-]
-
-let messageCounter = 100
-
-function generateId(): string {
-  messageCounter += 1
-  return `m-${messageCounter}`
+interface ApiSession {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
 }
 
 export function useChat() {
-  const [state, setState] = useState<ChatState>({
-    sessions: MOCK_SESSIONS,
-    activeSessionId: 's-1',
-    isLoading: false,
-  })
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [messagesBySession, setMessagesBySession] = useState<Record<string, Message[]>>({})
 
-  const activeSession = state.sessions.find(s => s.id === state.activeSessionId) ?? null
+  // Load sessions on mount
+  useEffect(() => {
+    apiGet<ApiSession[]>('/api/v1/chat/sessions')
+      .then((data) => {
+        const mapped: Session[] = data.map(s => ({
+          id: s.id,
+          title: s.title,
+          lastMessage: '',
+          updatedAt: new Date(s.updated_at),
+          messages: [],
+        }))
+        setSessions(mapped)
+        if (mapped.length > 0 && !activeSessionId)
+          setActiveSessionId(mapped[0].id)
+      })
+      .catch(() => {})
+  }, [])
+
+  const activeSession = sessions.find(s => s.id === activeSessionId) ?? null
+  const activeMessages = activeSessionId ? (messagesBySession[activeSessionId] || []) : []
+
+  // Build the active session with messages
+  const activeSessionWithMessages: Session | null = activeSession
+    ? { ...activeSession, messages: activeMessages }
+    : null
 
   const setActiveSession = useCallback((id: string) => {
-    setState(prev => ({ ...prev, activeSessionId: id }))
+    setActiveSessionId(id)
   }, [])
 
-  const createSession = useCallback(() => {
-    const newSession: Session = {
-      id: `s-${Date.now()}`,
-      title: 'New Chat',
-      lastMessage: '',
-      updatedAt: new Date(),
-      messages: [],
+  const createSession = useCallback(async () => {
+    // 防止重复创建：如果当前会话为空（无消息），不新建
+    if (activeSessionId) {
+      const msgs = messagesBySession[activeSessionId]
+      if (!msgs || msgs.length === 0) {
+        return // 当前会话还没有消息，不重复创建
+      }
     }
-    setState(prev => ({
-      ...prev,
-      sessions: [newSession, ...prev.sessions],
-      activeSessionId: newSession.id,
-    }))
+
+    try {
+      const data = await apiPost<ApiSession>('/api/v1/chat/sessions', { title: 'New Chat' })
+      const newSession: Session = {
+        id: data.id,
+        title: data.title,
+        lastMessage: '',
+        updatedAt: new Date(data.updated_at),
+        messages: [],
+      }
+      setSessions(prev => [newSession, ...prev])
+      setActiveSessionId(data.id)
+    }
+    catch {
+      // silently fail
+    }
+  }, [activeSessionId, messagesBySession])
+
+  const deleteSession = useCallback(async (sessionId: string) => {
+    try {
+      await apiDelete(`/api/v1/chat/sessions/${sessionId}`)
+      setSessions(prev => prev.filter(s => s.id !== sessionId))
+      if (activeSessionId === sessionId) {
+        setActiveSessionId(null)
+      }
+    }
+    catch {
+      // silently fail
+    }
+  }, [activeSessionId])
+
+  const renameSession = useCallback(async (sessionId: string, newTitle: string) => {
+    if (!newTitle.trim())
+      return
+    // 目前后端没有 PATCH 端点，先本地更新标题（后续加后端支持）
+    setSessions(prev => prev.map(s =>
+      s.id === sessionId ? { ...s, title: newTitle.trim() } : s,
+    ))
   }, [])
 
-  const sendMessage = useCallback((content: string) => {
-    if (!state.activeSessionId || !content.trim())
+  const sendMessage = useCallback(async (content: string) => {
+    if (!activeSessionId || !content.trim() || isLoading)
       return
 
-    const userMessage: Message = {
-      id: generateId(),
+    const userMsg: Message = {
+      id: `user-${Date.now()}`,
       role: 'user',
       content: content.trim(),
       timestamp: new Date(),
     }
 
-    setState((prev) => {
-      const sessions = prev.sessions.map((s) => {
-        if (s.id !== prev.activeSessionId)
-          return s
-        return {
-          ...s,
-          messages: [...s.messages, userMessage],
-          lastMessage: content.trim(),
-          updatedAt: new Date(),
-        }
-      })
-      return { ...prev, sessions, isLoading: true }
+    setMessagesBySession((prev) => {
+      const msgs = prev[activeSessionId] || []
+      return { ...prev, [activeSessionId]: [...msgs, userMsg] }
     })
 
-    // Simulate assistant response
-    setTimeout(() => {
-      const assistantMessage: Message = {
-        id: generateId(),
-        role: 'assistant',
-        content: `I received your message: "${content.trim()}"\n\nThis is a mock response. In production, this would be connected to the ADK Runner API to get real agent responses.`,
-        timestamp: new Date(),
-      }
+    setIsLoading(true)
 
-      setState((prev) => {
-        const sessions = prev.sessions.map((s) => {
-          if (s.id !== prev.activeSessionId)
-            return s
-          return {
-            ...s,
-            messages: [...s.messages, assistantMessage],
-            lastMessage: assistantMessage.content.slice(0, 50),
-            updatedAt: new Date(),
+    // Assistant message that we'll build up from SSE events
+    const assistantMsgId = `assistant-${Date.now()}`
+    let assistantContent = ''
+    const toolCalls: ToolCall[] = []
+    let toolCallCounter = 0
+
+    try {
+      for await (const event of streamSSE(`/api/v1/chat/sessions/${activeSessionId}/messages`, { content: content.trim() })) {
+        const eventType = event.event as string
+
+        if (eventType === 'text') {
+          assistantContent += event.content as string
+          setMessagesBySession((prev) => {
+            const msgs = (prev[activeSessionId] || []).filter(m => m.id !== assistantMsgId)
+            return {
+              ...prev,
+              [activeSessionId]: [...msgs, {
+                id: assistantMsgId,
+                role: 'assistant',
+                content: assistantContent,
+                timestamp: new Date(),
+                toolCalls: toolCalls.length > 0 ? [...toolCalls] : undefined,
+              }],
+            }
+          })
+        }
+        else if (eventType === 'tool_call') {
+          toolCallCounter++
+          toolCalls.push({
+            id: `tc-${toolCallCounter}`,
+            name: event.name as string,
+            args: (event.args as Record<string, unknown>) || {},
+            status: 'running',
+          })
+          setMessagesBySession((prev) => {
+            const msgs = (prev[activeSessionId] || []).filter(m => m.id !== assistantMsgId)
+            return {
+              ...prev,
+              [activeSessionId]: [...msgs, {
+                id: assistantMsgId,
+                role: 'assistant',
+                content: assistantContent || 'Calling tools...',
+                timestamp: new Date(),
+                toolCalls: [...toolCalls],
+              }],
+            }
+          })
+        }
+        else if (eventType === 'tool_result') {
+          const tc = toolCalls.find(t => t.name === event.name)
+          if (tc) {
+            tc.result = event.result as string
+            tc.status = 'completed'
           }
-        })
-        return { ...prev, sessions, isLoading: false }
+          setMessagesBySession((prev) => {
+            const msgs = (prev[activeSessionId] || []).filter(m => m.id !== assistantMsgId)
+            return {
+              ...prev,
+              [activeSessionId]: [...msgs, {
+                id: assistantMsgId,
+                role: 'assistant',
+                content: assistantContent || 'Processing...',
+                timestamp: new Date(),
+                toolCalls: [...toolCalls],
+              }],
+            }
+          })
+        }
+        else if (eventType === 'error') {
+          assistantContent += `\n\n**Error:** ${event.message}`
+        }
+      }
+    }
+    catch (err) {
+      assistantContent += `\n\n**Error:** ${err instanceof Error ? err.message : 'Unknown error'}`
+    }
+
+    // Final update
+    if (assistantContent || toolCalls.length > 0) {
+      setMessagesBySession((prev) => {
+        const msgs = (prev[activeSessionId] || []).filter(m => m.id !== assistantMsgId)
+        return {
+          ...prev,
+          [activeSessionId]: [...msgs, {
+            id: assistantMsgId,
+            role: 'assistant',
+            content: assistantContent || 'Done.',
+            timestamp: new Date(),
+            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+          }],
+        }
       })
-    }, 1200)
-  }, [state.activeSessionId])
+    }
+
+    // Update session last message
+    setSessions(prev => prev.map((s) => {
+      if (s.id !== activeSessionId)
+        return s
+      return { ...s, lastMessage: (assistantContent || content.trim()).slice(0, 50), updatedAt: new Date() }
+    }))
+
+    setIsLoading(false)
+  }, [activeSessionId, isLoading])
 
   return {
-    sessions: state.sessions,
-    activeSession,
-    isLoading: state.isLoading,
+    sessions,
+    activeSession: activeSessionWithMessages,
+    isLoading,
     setActiveSession,
     createSession,
+    deleteSession,
+    renameSession,
     sendMessage,
   }
 }

@@ -1,0 +1,21 @@
+{
+  "title": "Settings",
+  "apiTokens": "API Tokens",
+  "createToken": "Create Token",
+  "tokenName": "Token name",
+  "tokenNamePlaceholder": "e.g. CI Pipeline",
+  "tokenScopes": "Scopes",
+  "tokenCreated": "Token created! Copy it now, it won't be shown again:",
+  "revoke": "Revoke",
+  "noTokens": "No API tokens yet.",
+  "usage": "Usage",
+  "plan": "Plan",
+  "daily": "Today",
+  "weekly": "This Week",
+  "monthly": "This Month",
+  "used": "Used",
+  "remaining": "Remaining",
+  "settings": "Settings",
+  "logout": "Logout",
+  "admin": "Admin"
+}

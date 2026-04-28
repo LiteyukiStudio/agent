@@ -1,7 +1,8 @@
 from google.adk.agents.llm_agent import Agent
 
-from gitea_agent.agent import gitea_agent
 from model_config import get_model
+
+from .agents.gitea_agent.agent import gitea_agent
 
 root_agent = Agent(
     model=get_model("root_agent"),

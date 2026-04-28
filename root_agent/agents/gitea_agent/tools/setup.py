@@ -1,7 +1,7 @@
-"""Interactive Gitea credential setup tools.
+"""Gitea 凭证交互式配置工具。
 
-Allows the agent to configure Gitea connection at runtime via conversation,
-with fallback to .env environment variables.
+允许 Agent 在对话中配置 Gitea 连接信息，
+同时支持 .env 环境变量作为回退。
 """
 
 from __future__ import annotations
@@ -18,14 +18,14 @@ def setup_gitea(base_url: str, token: str, tool_context: ToolContext) -> dict:
         base_url: Gitea instance URL, e.g. https://gitea.example.com
         token: Gitea API access token
     """
-    # Write to ADK session state (available to all tools in this session)
+    # 写入 ADK session state（当前会话内所有工具可用）
     tool_context.state["gitea_base_url"] = base_url
     tool_context.state["gitea_token"] = token
 
-    # Persist to file (survives across sessions)
+    # 持久化到文件（跨会话保留）
     GiteaClient.save_credentials(base_url, token)
 
-    # Quick connectivity check
+    # 快速连通性检查
     try:
         client = GiteaClient(base_url=base_url, token=token)
         result = client.get("/version")
@@ -54,7 +54,7 @@ def show_gitea_config(tool_context: ToolContext) -> dict:
     base_url = ""
     has_token = False
 
-    # Check session state
+    # 检查 session state
     session_url = tool_context.state.get("gitea_base_url", "")
     session_token = tool_context.state.get("gitea_token", "")
     if session_url:
@@ -62,7 +62,7 @@ def show_gitea_config(tool_context: ToolContext) -> dict:
         base_url = session_url
         has_token = bool(session_token)
 
-    # Check env
+    # 检查环境变量
     env_url = os.getenv("GITEA_BASE_URL", "")
     env_token = os.getenv("GITEA_TOKEN", "")
     if env_url:
@@ -71,7 +71,7 @@ def show_gitea_config(tool_context: ToolContext) -> dict:
             base_url = env_url
             has_token = bool(env_token)
 
-    # Check file
+    # 检查凭证文件
     saved = GiteaClient.load_saved_credentials()
     if saved.get("base_url"):
         sources.append("file")
