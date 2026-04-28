@@ -1,0 +1,74 @@
+[project]
+name = "adk-demo"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "google-adk[extensions]>=1.31.1",
+    "httpx>=0.28",
+    "litellm>=1.50",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["root_agent"]
+
+[project.scripts]
+dev = "root_agent._cli:dev"
+web = "root_agent._cli:web"
+lint = "root_agent._cli:lint"
+fmt = "root_agent._cli:fmt"
+fix = "root_agent._cli:fix"
+check = "root_agent._cli:check"
+
+# ---------------------------------------------------------------------------
+# Ruff
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py313"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "F",      # pyflakes — unused imports, undefined names, etc.
+    "E",      # pycodestyle errors
+    "W",      # pycodestyle warnings
+    "I",      # isort — import sorting
+    "N",      # pep8-naming
+    "UP",     # pyupgrade — modern Python syntax
+    "B",      # flake8-bugbear — common pitfalls
+    "A",      # flake8-builtins — shadowing builtins
+    "T20",    # flake8-print — no stray print()
+    "SIM",    # flake8-simplify — simplifiable constructs
+    "TCH",    # flake8-type-checking — TYPE_CHECKING imports
+    "RUF",    # ruff-specific rules
+    "ANN",    # flake8-annotations — enforce type annotations
+    "C4",     # flake8-comprehensions
+    "PIE",    # flake8-pie — misc lints
+    "RET",    # flake8-return — return consistency
+    "PTH",    # flake8-use-pathlib
+]
+ignore = [
+    "ANN401",  # typing.Any disallowed — too strict for API wrappers
+    "RUF001",  # ambiguous unicode — false positives on Chinese text in instructions/descriptions
+    "RUF002",  # ambiguous unicode in docstrings
+    "RUF003",  # ambiguous unicode in comments
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["root_agent", "gitea_agent", "model_config"]
+force-single-line = false
+combine-as-imports = true
+
+[tool.ruff.lint.per-file-ignores]
+"**/tools/*.py" = ["T20", "TCH"]  # allow print(); ADK needs runtime type annotations for ToolContext injection
+"**/__init__.py" = ["F401"]       # allow unused imports in __init__.py (re-exports)
