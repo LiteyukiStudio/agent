@@ -183,6 +183,15 @@ GITEA_AGENT_TOKEN=sk-yyy
 3. 在 `root_agent/agent.py` 的 `sub_agents` 中添加导入
 4. 在 `model_config.py` 中通过环境变量配置专属模型（可选）
 
+## 开发规范
+
+编码约定、项目结构、命名规则等请阅读 **[CONTRIBUTING.md](./CONTRIBUTING.md)**。提交代码前请确保通过 lint 检查：
+
+```bash
+uv run check          # Python
+cd web && pnpm lint   # TypeScript
+```
+
 ## License
 
 MIT
