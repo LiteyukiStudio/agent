@@ -36,7 +36,7 @@ export function Sidebar({ sessions, activeSessionId, onSelectSession, onNewSessi
         <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900">
           <Snowflake className="size-4 text-emerald-700 dark:text-emerald-300" />
         </div>
-        <span className="text-sm font-semibold tracking-tight">LiteYuki SRE</span>
+        <span className="text-sm font-semibold tracking-tight">Liteyuki Agent</span>
       </div>
 
       <Separator />

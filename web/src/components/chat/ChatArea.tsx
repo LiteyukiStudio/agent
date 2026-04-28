@@ -25,7 +25,7 @@ export function ChatArea({ session, isLoading, onSend }: ChatAreaProps) {
           <Bot className="size-8" />
         </div>
         <div className="text-center">
-          <h2 className="text-lg font-medium text-foreground">LiteYuki SRE Agent</h2>
+          <h2 className="text-lg font-medium text-foreground">Liteyuki Agent</h2>
           <p className="mt-1 text-sm">Select a session or create a new one to get started</p>
         </div>
       </div>

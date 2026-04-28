@@ -36,3 +36,8 @@ def check() -> None:
     ret = subprocess.call(["ruff", "check", "."])
     ret2 = subprocess.call(["ruff", "format", "--check", "."])
     sys.exit(ret or ret2)
+
+
+def server() -> None:
+    """Start the FastAPI backend server."""
+    sys.exit(subprocess.call(["uvicorn", "server.main:app", "--reload", "--port", "8000"]))

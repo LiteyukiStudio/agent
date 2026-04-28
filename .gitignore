@@ -22,3 +22,7 @@ wheels/
 
 # Credentials
 .credentials.json
+
+# Database
+data.db
+*.db-journal
