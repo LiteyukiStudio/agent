@@ -29,6 +29,9 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      // 输入法组合状态（如中文/日文候选词选择）时不触发发送
+      if (e.nativeEvent.isComposing || e.keyCode === 229)
+        return
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault()
         handleSend()

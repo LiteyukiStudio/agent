@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import uuid4
 
-from sqlalchemy import DateTime, ForeignKey, String, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from server.database import Base
@@ -19,6 +19,8 @@ class ChatSession(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid4()))
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(200), default="New Chat")
+    title_custom: Mapped[bool] = mapped_column(Boolean, default=False)  # 用户是否手动修改过标题
+    last_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
     adk_session_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

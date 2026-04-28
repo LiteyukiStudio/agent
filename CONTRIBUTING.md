@@ -10,6 +10,13 @@
 - 提交信息遵循 [Conventional Commits](https://www.conventionalcommits.org/)：`feat:` / `fix:` / `refactor:` / `docs:` / `chore:`
 - 不提交 `.env`、`.credentials.json`、`node_modules`、`__pycache__` 等敏感或生成文件
 - **注释语言**：Python 代码的注释、模块 docstring、行内注释、段落标题统一用**中文**。工具函数的 docstring（`tools/*.py`）保持当前语言以确保 LLM 工具识别准确。TypeScript 注释保持英文。
+- **配置项变更**：新增或修改环境变量时，必须同步更新 `.env.example`，并用注释标注：是否必填、作用说明、默认值。格式示例：
+  ```env
+  # [必填] JWT 签名密钥，用于用户认证令牌签发
+  SECRET_KEY=请替换为随机字符串
+  # [可选] PostgreSQL 连接地址，默认使用 SQLite
+  # DATABASE_URL=postgresql+asyncpg://user:pass@host:5432/db
+  ```
 
 ## Python
 
@@ -75,7 +82,26 @@ uv run fix     # 自动修复 + 格式化
 uv run check   # CI 用，不修改文件
 ```
 
+### 数据库迁移
+
+本项目使用 SQLAlchemy `create_all()` 在启动时自动建表。**已存在的表不会被自动修改**。
+
+- **新增表**：直接加 Model，重启后端即可自动创建
+- **修改已有表结构**（加字段、改类型等）：需要**删除 `data.db` 并重启**
+  ```bash
+  rm data.db && uv run server
+  ```
+  这会丢失所有开发数据（用户、会话等），重启后自动重建表 + 初始超级用户
+- **生产环境**：后续引入 Alembic 做正式迁移，开发阶段直接重建即可
+- **注意**：改完 Model 后如果不删库重建，会出现 500 错误（表结构不匹配）
+
 ## TypeScript (web/)
+
+### 包管理
+
+- **强制使用 pnpm**，禁止使用 npm / yarn
+- 安装依赖：`pnpm install`，添加包：`pnpm add <pkg>`
+- 项目已配置 `packageManager` 字段，确保团队版本一致
 
 ### 风格
 

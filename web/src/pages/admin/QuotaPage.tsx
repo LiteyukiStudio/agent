@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 
 interface QuotaPlan {
@@ -29,9 +32,11 @@ function formatTokens(n: number | null): string {
 }
 
 export function QuotaPage() {
+  const { t: tc } = useTranslation('common')
   const [plans, setPlans] = useState<QuotaPlan[]>([])
   const [form, setForm] = useState({ name: '', daily_tokens: '', weekly_tokens: '', monthly_tokens: '', requests_per_minute: '10' })
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const load = useCallback(() => {
     apiGet<QuotaPlan[]>('/api/v1/admin/quota-plans').then(setPlans).catch(() => {})
@@ -40,27 +45,47 @@ export function QuotaPage() {
   useEffect(() => { load() }, [load])
 
   async function handleCreate() {
-    await apiPost('/api/v1/admin/quota-plans', {
-      name: form.name,
-      daily_tokens: form.daily_tokens ? Number(form.daily_tokens) : null,
-      weekly_tokens: form.weekly_tokens ? Number(form.weekly_tokens) : null,
-      monthly_tokens: form.monthly_tokens ? Number(form.monthly_tokens) : null,
-      requests_per_minute: Number(form.requests_per_minute) || 10,
-      is_default: false,
-    })
-    setForm({ name: '', daily_tokens: '', weekly_tokens: '', monthly_tokens: '', requests_per_minute: '10' })
-    setDialogOpen(false)
-    load()
+    try {
+      await apiPost('/api/v1/admin/quota-plans', {
+        name: form.name,
+        daily_tokens: form.daily_tokens ? Number(form.daily_tokens) : null,
+        weekly_tokens: form.weekly_tokens ? Number(form.weekly_tokens) : null,
+        monthly_tokens: form.monthly_tokens ? Number(form.monthly_tokens) : null,
+        requests_per_minute: Number(form.requests_per_minute) || 10,
+        is_default: false,
+      })
+      setForm({ name: '', daily_tokens: '', weekly_tokens: '', monthly_tokens: '', requests_per_minute: '10' })
+      setDialogOpen(false)
+      load()
+      toast.success('Plan created')
+    }
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create plan')
+    }
   }
 
   async function handleSetDefault(id: string) {
-    await apiPatch(`/api/v1/admin/quota-plans/${id}`, { is_default: true })
-    load()
+    try {
+      await apiPatch(`/api/v1/admin/quota-plans/${id}`, { is_default: true })
+      load()
+      toast.success('Default plan updated')
+    }
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to set default')
+    }
   }
 
-  async function handleDelete(id: string) {
-    await apiDelete(`/api/v1/admin/quota-plans/${id}`)
-    load()
+  async function handleDeleteConfirm() {
+    if (!deleteId)
+      return
+    try {
+      await apiDelete(`/api/v1/admin/quota-plans/${deleteId}`)
+      setDeleteId(null)
+      load()
+    }
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete plan')
+    }
   }
 
   return (
@@ -88,9 +113,9 @@ export function QuotaPage() {
             </div>
             <DialogFooter>
               <DialogClose
-                render={<Button variant="outline">Cancel</Button>}
+                render={<Button variant="outline">{tc('cancel')}</Button>}
               />
-              <Button onClick={handleCreate} disabled={!form.name}>Create</Button>
+              <Button onClick={handleCreate} disabled={!form.name}>{tc('create')}</Button>
             </DialogFooter>
           </DialogContent>
         </Dialog>
@@ -128,8 +153,13 @@ export function QuotaPage() {
                         )}
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}>
-                      <Trash2 className="size-4 text-destructive" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setDeleteId(p.id)}
+                    >
+                      <Trash2 className="size-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -137,7 +167,7 @@ export function QuotaPage() {
               {plans.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center text-muted-foreground">
-                    No quota plans yet.
+                    {tc('noData')}
                   </TableCell>
                 </TableRow>
               )}
@@ -145,6 +175,14 @@ export function QuotaPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={open => !open && setDeleteId(null)}
+        title={tc('confirmDelete')}
+        description={tc('confirmDeleteDesc')}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   )
 }

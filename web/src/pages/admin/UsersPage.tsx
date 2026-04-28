@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -44,8 +45,14 @@ export function UsersPage() {
   }, [loadUsers])
 
   async function handleRoleChange(userId: string, role: string) {
-    await apiPatch(`/api/v1/admin/users/${userId}`, { role })
-    loadUsers()
+    try {
+      await apiPatch(`/api/v1/admin/users/${userId}`, { role })
+      loadUsers()
+      toast.success('Role updated')
+    }
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update role')
+    }
   }
 
   const isSuperuser = me?.role === 'superuser'

@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Plus, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { apiDelete, apiGet, apiPost } from '@/lib/api'
 
 interface OAuthProvider {
@@ -19,9 +22,11 @@ interface OAuthProvider {
 }
 
 export function OAuthPage() {
+  const { t: tc } = useTranslation('common')
   const [providers, setProviders] = useState<OAuthProvider[]>([])
   const [form, setForm] = useState({ name: '', issuer_url: '', client_id: '', client_secret: '' })
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const load = useCallback(() => {
     apiGet<OAuthProvider[]>('/api/v1/admin/oauth-providers').then(setProviders).catch(() => {})
@@ -30,15 +35,29 @@ export function OAuthPage() {
   useEffect(() => { load() }, [load])
 
   async function handleCreate() {
-    await apiPost('/api/v1/admin/oauth-providers', form)
-    setForm({ name: '', issuer_url: '', client_id: '', client_secret: '' })
-    setDialogOpen(false)
-    load()
+    try {
+      await apiPost('/api/v1/admin/oauth-providers', form)
+      setForm({ name: '', issuer_url: '', client_id: '', client_secret: '' })
+      setDialogOpen(false)
+      load()
+      toast.success('Provider created')
+    }
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create provider')
+    }
   }
 
-  async function handleDelete(id: string) {
-    await apiDelete(`/api/v1/admin/oauth-providers/${id}`)
-    load()
+  async function handleDeleteConfirm() {
+    if (!deleteId)
+      return
+    try {
+      await apiDelete(`/api/v1/admin/oauth-providers/${deleteId}`)
+      setDeleteId(null)
+      load()
+    }
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete provider')
+    }
   }
 
   return (
@@ -65,10 +84,10 @@ export function OAuthPage() {
             </div>
             <DialogFooter>
               <DialogClose
-                render={<Button variant="outline">Cancel</Button>}
+                render={<Button variant="outline">{tc('cancel')}</Button>}
               />
               <Button onClick={handleCreate} disabled={!form.name || !form.issuer_url || !form.client_id}>
-                Create
+                {tc('create')}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -97,12 +116,17 @@ export function OAuthPage() {
                   </TableCell>
                   <TableCell>
                     <Badge variant={p.enabled ? 'default' : 'secondary'}>
-                      {p.enabled ? 'Enabled' : 'Disabled'}
+                      {p.enabled ? tc('enabled') : tc('disabled')}
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(p.id)}>
-                      <Trash2 className="size-4 text-destructive" />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-destructive hover:text-destructive"
+                      onClick={() => setDeleteId(p.id)}
+                    >
+                      <Trash2 className="size-4" />
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -110,7 +134,7 @@ export function OAuthPage() {
               {providers.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground">
-                    No OAuth providers configured yet.
+                    {tc('noData')}
                   </TableCell>
                 </TableRow>
               )}
@@ -118,6 +142,14 @@ export function OAuthPage() {
           </Table>
         </CardContent>
       </Card>
+
+      <ConfirmDialog
+        open={!!deleteId}
+        onOpenChange={open => !open && setDeleteId(null)}
+        title={tc('confirmDelete')}
+        description={tc('confirmDeleteDesc')}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   )
 }

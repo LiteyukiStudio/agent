@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
 import { Bot, Snowflake } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -21,7 +22,6 @@ export function LoginPage() {
   const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [providers, setProviders] = useState<OAuthProvider[]>([])
 
@@ -38,14 +38,13 @@ export function LoginPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setError('')
     setLoading(true)
     try {
       await login(username, password)
       navigate('/', { replace: true })
     }
     catch (err) {
-      setError(err instanceof Error ? err.message : t('loginFailed'))
+      toast.error(err instanceof Error ? err.message : t('loginFailed'))
     }
     finally {
       setLoading(false)
@@ -82,7 +81,6 @@ export function LoginPage() {
               onChange={e => setPassword(e.target.value)}
               required
             />
-            {error && <p className="text-sm text-destructive">{error}</p>}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? t('loggingIn') : t('login')}
             </Button>

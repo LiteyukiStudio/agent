@@ -1,4 +1,5 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
+import { Toaster } from 'sonner'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { LoginPage } from '@/pages/LoginPage'
 import { ChatPage } from '@/pages/ChatPage'
@@ -11,6 +12,7 @@ import { QuotaPage } from '@/pages/admin/QuotaPage'
 export default function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-center" richColors closeButton />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
 

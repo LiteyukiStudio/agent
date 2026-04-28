@@ -1,42 +1,106 @@
 import { useCallback, useEffect, useState } from 'react'
-import { apiDelete, apiGet, apiPost, streamSSE } from '@/lib/api'
+import { toast } from 'sonner'
+import { apiDelete, apiGet, apiPatch, apiPost, streamSSE } from '@/lib/api'
+import { useAuth } from '@/hooks/useAuth'
 import type { Message, Session, ToolCall } from '@/types/chat'
 
 interface ApiSession {
   id: string
   title: string
+  last_message: string | null
   created_at: string
   updated_at: string
 }
 
+interface ApiMessage {
+  id: string
+  session_id: string
+  role: 'user' | 'assistant'
+  content: string
+  tool_calls: string | null
+  created_at: string
+}
+
+function parseApiMessages(data: ApiMessage[]): Message[] {
+  return data.map((m) => {
+    let toolCalls: ToolCall[] | undefined
+    if (m.tool_calls) {
+      try {
+        const parsed = JSON.parse(m.tool_calls) as Array<{ name: string, args?: Record<string, unknown>, result?: string }>
+        toolCalls = parsed.map((tc, i) => ({
+          id: `tc-${i}`,
+          name: tc.name,
+          args: tc.args || {},
+          result: tc.result,
+          status: 'completed' as const,
+        }))
+      }
+      catch {
+        // ignore parse error
+      }
+    }
+    return {
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      timestamp: new Date(m.created_at),
+      toolCalls,
+    }
+  })
+}
+
 export function useChat() {
+  const { user } = useAuth()
   const [sessions, setSessions] = useState<Session[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [messagesBySession, setMessagesBySession] = useState<Record<string, Message[]>>({})
 
-  // Load sessions on mount
+  // 在用户认证完成后才加载 sessions
   useEffect(() => {
+    if (!user)
+      return
     apiGet<ApiSession[]>('/api/v1/chat/sessions')
       .then((data) => {
         const mapped: Session[] = data.map(s => ({
           id: s.id,
           title: s.title,
-          lastMessage: '',
+          lastMessage: s.last_message || '',
           updatedAt: new Date(s.updated_at),
           messages: [],
         }))
         setSessions(mapped)
-        if (mapped.length > 0 && !activeSessionId)
+        if (mapped.length > 0 && !activeSessionId) {
           setActiveSessionId(mapped[0].id)
+        }
       })
-      .catch(() => {})
-  }, [])
+      .catch(() => { /* auth guard handles redirect */ })
+  }, [user])
+
+  // 加载会话消息（切换会话时）
+  const loadMessages = useCallback(async (sessionId: string) => {
+    if (messagesBySession[sessionId])
+      return // 已加载
+    try {
+      const data = await apiGet<ApiMessage[]>(`/api/v1/chat/sessions/${sessionId}/messages`)
+      const messages = parseApiMessages(data)
+      setMessagesBySession(prev => ({ ...prev, [sessionId]: messages }))
+    }
+    catch {
+      // message load failure is non-critical
+    }
+  }, [messagesBySession])
+
+  // 切换 session 时自动加载消息
+  useEffect(() => {
+    if (activeSessionId) {
+      loadMessages(activeSessionId)
+    }
+  }, [activeSessionId, loadMessages])
 
   const activeSession = sessions.find(s => s.id === activeSessionId) ?? null
   const activeMessages = activeSessionId ? (messagesBySession[activeSessionId] || []) : []
 
-  // Build the active session with messages
   const activeSessionWithMessages: Session | null = activeSession
     ? { ...activeSession, messages: activeMessages }
     : null
@@ -50,7 +114,7 @@ export function useChat() {
     if (activeSessionId) {
       const msgs = messagesBySession[activeSessionId]
       if (!msgs || msgs.length === 0) {
-        return // 当前会话还没有消息，不重复创建
+        return
       }
     }
 
@@ -66,8 +130,8 @@ export function useChat() {
       setSessions(prev => [newSession, ...prev])
       setActiveSessionId(data.id)
     }
-    catch {
-      // silently fail
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create session')
     }
   }, [activeSessionId, messagesBySession])
 
@@ -75,22 +139,32 @@ export function useChat() {
     try {
       await apiDelete(`/api/v1/chat/sessions/${sessionId}`)
       setSessions(prev => prev.filter(s => s.id !== sessionId))
+      setMessagesBySession((prev) => {
+        const next = { ...prev }
+        delete next[sessionId]
+        return next
+      })
       if (activeSessionId === sessionId) {
         setActiveSessionId(null)
       }
     }
-    catch {
-      // silently fail
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete session')
     }
   }, [activeSessionId])
 
   const renameSession = useCallback(async (sessionId: string, newTitle: string) => {
     if (!newTitle.trim())
       return
-    // 目前后端没有 PATCH 端点，先本地更新标题（后续加后端支持）
-    setSessions(prev => prev.map(s =>
-      s.id === sessionId ? { ...s, title: newTitle.trim() } : s,
-    ))
+    try {
+      await apiPatch(`/api/v1/chat/sessions/${sessionId}`, { title: newTitle.trim() })
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId ? { ...s, title: newTitle.trim() } : s,
+      ))
+    }
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to rename session')
+    }
   }, [])
 
   const sendMessage = useCallback(async (content: string) => {
@@ -111,7 +185,6 @@ export function useChat() {
 
     setIsLoading(true)
 
-    // Assistant message that we'll build up from SSE events
     const assistantMsgId = `assistant-${Date.now()}`
     let assistantContent = ''
     const toolCalls: ToolCall[] = []
@@ -181,6 +254,12 @@ export function useChat() {
         }
         else if (eventType === 'error') {
           assistantContent += `\n\n**Error:** ${event.message}`
+        }
+        else if (eventType === 'done' && event.title) {
+          const newTitle = event.title as string
+          setSessions(prev => prev.map(s =>
+            s.id === activeSessionId ? { ...s, title: newTitle } : s,
+          ))
         }
       }
     }

@@ -39,5 +39,17 @@ def check() -> None:
 
 
 def server() -> None:
-    """启动 FastAPI 后端服务器。"""
-    sys.exit(subprocess.call(["uvicorn", "server.main:app", "--reload", "--port", "8000"]))
+    """启动 FastAPI 后端服务器（开发模式，代码和 .env 变更自动重载）。"""
+    sys.exit(
+        subprocess.call(
+            [
+                "uvicorn",
+                "server.main:app",
+                "--reload",
+                "--reload-include",
+                "*.env",
+                "--port",
+                "8000",
+            ]
+        )
+    )

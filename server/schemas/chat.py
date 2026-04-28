@@ -12,6 +12,7 @@ class SessionResponse(BaseModel):
 
     id: str
     title: str
+    last_message: str | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -24,10 +25,29 @@ class SessionCreate(BaseModel):
     title: str = "New Chat"
 
 
+class SessionRename(BaseModel):
+    """重命名聊天会话的请求体。"""
+
+    title: str
+
+
 class MessageSend(BaseModel):
     """向 Agent 发送消息的请求体。"""
 
     content: str
+
+
+class MessageResponse(BaseModel):
+    """持久化的聊天消息响应。"""
+
+    id: str
+    session_id: str
+    role: str
+    content: str
+    tool_calls: str | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class MessageEvent(BaseModel):

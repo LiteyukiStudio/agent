@@ -8,6 +8,7 @@
   "tokenCreated": "Token created! Copy it now, it won't be shown again:",
   "revoke": "Revoke",
   "noTokens": "No API tokens yet.",
+  "tokenCopied": "Token copied to clipboard",
   "usage": "Usage",
   "plan": "Plan",
   "daily": "Today",

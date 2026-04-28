@@ -1,14 +1,36 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { useNavigate } from 'react-router'
-import { Ellipsis, Globe, LogOut, MessageSquarePlus, Pencil, Settings, Shield, Snowflake, Trash2 } from 'lucide-react'
+import {
+  ChevronUp,
+  Ellipsis,
+  Globe,
+  LogOut,
+  MessageSquarePlus,
+  Moon,
+  Pencil,
+  Settings,
+  Shield,
+  Snowflake,
+  Sun,
+  Trash2,
+} from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { ThemeToggle } from '@/components/chat/ThemeToggle'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import type { Session } from '@/types/chat'
@@ -29,12 +51,12 @@ function formatRelativeTime(date: Date): string {
   if (minutes < 1)
     return 'just now'
   if (minutes < 60)
-    return `${minutes}m ago`
+    return `${minutes}m`
   const hours = Math.floor(minutes / 60)
   if (hours < 24)
-    return `${hours}h ago`
+    return `${hours}h`
   const days = Math.floor(hours / 24)
-  return `${days}d ago`
+  return `${days}d`
 }
 
 const LANGUAGES = [
@@ -52,6 +74,17 @@ export function Sidebar({ sessions, activeSessionId, onSelectSession, onNewSessi
   const navigate = useNavigate()
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [theme, setTheme] = useState(() =>
+    document.documentElement.classList.contains('dark') ? 'dark' : 'light',
+  )
+
+  function toggleTheme() {
+    const next = theme === 'dark' ? 'light' : 'dark'
+    setTheme(next)
+    document.documentElement.classList.toggle('dark', next === 'dark')
+    localStorage.setItem('theme', next)
+  }
 
   function changeLanguage(lng: string) {
     i18n.changeLanguage(lng)
@@ -70,9 +103,16 @@ export function Sidebar({ sessions, activeSessionId, onSelectSession, onNewSessi
     setRenameValue('')
   }
 
+  function handleDeleteConfirm() {
+    if (deleteConfirmId && onDeleteSession) {
+      onDeleteSession(deleteConfirmId)
+    }
+    setDeleteConfirmId(null)
+  }
+
   return (
     <div className="flex h-full w-[280px] flex-col border-r bg-sidebar">
-      {/* Brand */}
+      {/* 顶部品牌 */}
       <div className="flex h-14 items-center gap-2.5 px-4">
         <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900">
           <Snowflake className="size-4 text-emerald-700 dark:text-emerald-300" />
@@ -82,7 +122,7 @@ export function Sidebar({ sessions, activeSessionId, onSelectSession, onNewSessi
 
       <Separator />
 
-      {/* New chat button */}
+      {/* 新建对话按钮 */}
       <div className="p-3">
         <Button
           variant="outline"
@@ -94,7 +134,7 @@ export function Sidebar({ sessions, activeSessionId, onSelectSession, onNewSessi
         </Button>
       </div>
 
-      {/* Session list */}
+      {/* 会话列表 */}
       <ScrollArea className="flex-1 px-3">
         <div className="space-y-1 pb-3">
           {sessions.map(session => (
@@ -131,38 +171,36 @@ export function Sidebar({ sessions, activeSessionId, onSelectSession, onNewSessi
                     </span>
                   )}
               <span className="flex w-full items-center justify-between text-xs text-muted-foreground">
-                <span className="max-w-[160px] truncate">{session.lastMessage || t('noSessionMessages')}</span>
-                {/* 时间 + 悬浮三点菜单 */}
-                <span className="ml-2 shrink-0">
-                  <span className="group-hover:hidden">{formatRelativeTime(session.updatedAt)}</span>
-                  <span className="hidden group-hover:inline-flex">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger
-                        render={
-                          <button
-                            type="button"
-                            className="inline-flex size-5 items-center justify-center rounded hover:bg-sidebar-border"
-                            onClick={e => e.stopPropagation()}
-                          >
-                            <Ellipsis className="size-3.5" />
-                          </button>
-                        }
-                      />
-                      <DropdownMenuContent>
-                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); startRename(session) }}>
-                          <Pencil className="mr-2 size-3.5" />
-                          {tc('rename')}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="text-destructive"
-                          onClick={(e) => { e.stopPropagation(); onDeleteSession?.(session.id) }}
+                <span className="max-w-[140px] truncate">{session.lastMessage || t('noSessionMessages')}</span>
+                {/* 正常显示时间，悬浮时显示三点菜单 */}
+                <span className="relative ml-2 shrink-0">
+                  <span className="transition-opacity group-hover:opacity-0">{formatRelativeTime(session.updatedAt)}</span>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger
+                      render={
+                        <button
+                          type="button"
+                          className="absolute inset-0 flex items-center justify-center rounded opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                          onClick={e => e.stopPropagation()}
                         >
-                          <Trash2 className="mr-2 size-3.5" />
-                          {tc('delete')}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </span>
+                          <Ellipsis className="size-3.5" />
+                        </button>
+                      }
+                    />
+                    <DropdownMenuContent align="end" side="bottom">
+                      <DropdownMenuItem onClick={() => startRename(session)}>
+                        <Pencil className="mr-2 size-3.5" />
+                        {tc('rename')}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        variant="destructive"
+                        onClick={() => setDeleteConfirmId(session.id)}
+                      >
+                        <Trash2 className="mr-2 size-3.5" />
+                        {tc('delete')}
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </span>
               </span>
             </div>
@@ -172,59 +210,82 @@ export function Sidebar({ sessions, activeSessionId, onSelectSession, onNewSessi
 
       <Separator />
 
-      {/* User & Navigation */}
-      <div className="space-y-1 p-3">
-        {user && (
-          <div className="mb-2 flex items-center gap-2 px-1">
-            <Avatar className="size-6">
-              <AvatarFallback className="bg-primary text-primary-foreground text-xs">
-                {user.username.slice(0, 2).toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
-            <span className="flex-1 truncate text-sm font-medium">{user.username}</span>
-          </div>
-        )}
+      {/* 底部用户菜单 */}
+      <div className="p-3">
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors hover:bg-sidebar-accent"
+              >
+                <Avatar className="size-7">
+                  <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                    {user?.username.slice(0, 2).toUpperCase() || '?'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 overflow-hidden">
+                  <p className="truncate text-sm font-medium">{user?.username}</p>
+                  <p className="truncate text-xs text-muted-foreground">{user?.email || user?.role}</p>
+                </div>
+                <ChevronUp className="size-4 text-muted-foreground" />
+              </button>
+            }
+          />
+          <DropdownMenuContent side="top" align="start" className="w-[248px]">
+            <DropdownMenuItem onClick={() => navigate('/settings')}>
+              <Settings className="mr-2 size-4" />
+              {ts('settings')}
+            </DropdownMenuItem>
 
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" className="flex-1 justify-start gap-2 text-xs" onClick={() => navigate('/settings')}>
-            <Settings className="size-3.5" />
-            {ts('settings')}
-          </Button>
+            {isAdmin && (
+              <DropdownMenuItem onClick={() => navigate('/admin/users')}>
+                <Shield className="mr-2 size-4" />
+                {ts('admin')}
+              </DropdownMenuItem>
+            )}
 
-          {isAdmin && (
-            <Button variant="ghost" size="sm" className="flex-1 justify-start gap-2 text-xs" onClick={() => navigate('/admin/users')}>
-              <Shield className="size-3.5" />
-              {ts('admin')}
-            </Button>
-          )}
-        </div>
+            <DropdownMenuSeparator />
 
-        <div className="flex items-center justify-between pt-1">
-          <Button variant="ghost" size="sm" className="gap-2 text-xs text-muted-foreground" onClick={logout}>
-            <LogOut className="size-3.5" />
-            {ts('logout')}
-          </Button>
-          <div className="flex items-center gap-1">
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button variant="ghost" size="icon" className="size-8">
-                    <Globe className="size-4" />
-                  </Button>
-                }
-              />
-              <DropdownMenuContent>
+            <DropdownMenuItem onClick={toggleTheme}>
+              {theme === 'dark'
+                ? <Sun className="mr-2 size-4" />
+                : <Moon className="mr-2 size-4" />}
+              {theme === 'dark' ? tc('lightMode') : tc('darkMode')}
+            </DropdownMenuItem>
+
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Globe className="mr-2 size-4" />
+                {tc('language')}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
                 {LANGUAGES.map(lang => (
                   <DropdownMenuItem key={lang.code} onClick={() => changeLanguage(lang.code)}>
                     {tc(lang.label)}
                   </DropdownMenuItem>
                 ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <ThemeToggle />
-          </div>
-        </div>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
+            <DropdownMenuSeparator />
+
+            <DropdownMenuItem variant="destructive" onClick={logout}>
+              <LogOut className="mr-2 size-4" />
+              {ts('logout')}
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
+      {/* 删除确认对话框 */}
+      <ConfirmDialog
+        open={!!deleteConfirmId}
+        onOpenChange={open => !open && setDeleteConfirmId(null)}
+        title={tc('confirmDelete')}
+        description={tc('confirmDeleteSession')}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   )
 }

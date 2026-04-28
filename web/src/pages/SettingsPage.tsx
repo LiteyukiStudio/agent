@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy, Key, Plus, Trash2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { apiDelete, apiGet, apiPost } from '@/lib/api'
 
 interface ApiToken {
@@ -38,6 +40,7 @@ export function SettingsPage() {
   const [newTokenName, setNewTokenName] = useState('')
   const [createdToken, setCreatedToken] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
+  const [deleteTokenId, setDeleteTokenId] = useState<string | null>(null)
 
   const loadTokens = useCallback(() => {
     apiGet<ApiToken[]>('/api/v1/auth/tokens').then(setTokens).catch(() => {})
@@ -62,22 +65,32 @@ export function SettingsPage() {
       setNewTokenName('')
       loadTokens()
     }
-    catch {
-      // error
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to create token')
     }
     finally {
       setCreating(false)
     }
   }
 
-  async function handleDelete(id: string) {
-    await apiDelete(`/api/v1/auth/tokens/${id}`)
-    loadTokens()
+  async function handleDeleteConfirm() {
+    if (!deleteTokenId)
+      return
+    try {
+      await apiDelete(`/api/v1/auth/tokens/${deleteTokenId}`)
+      setDeleteTokenId(null)
+      loadTokens()
+    }
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete token')
+    }
   }
 
   function copyToken() {
-    if (createdToken)
+    if (createdToken) {
       navigator.clipboard.writeText(createdToken)
+      toast.success(t('tokenCopied'))
+    }
   }
 
   return (
@@ -118,7 +131,7 @@ export function SettingsPage() {
           <CardContent className="pt-4">
             <p className="mb-2 text-sm font-medium">{t('tokenCreated')}</p>
             <div className="flex items-center gap-2">
-              <code className="flex-1 rounded bg-background p-2 text-xs break-all">{createdToken}</code>
+              <code className="flex-1 break-all rounded bg-background p-2 text-xs">{createdToken}</code>
               <Button variant="outline" size="icon" onClick={copyToken}>
                 <Copy className="size-4" />
               </Button>
@@ -167,13 +180,27 @@ export function SettingsPage() {
                   {new Date(tok.created_at).toLocaleDateString()}
                 </p>
               </div>
-              <Button variant="ghost" size="icon" onClick={() => handleDelete(tok.id)}>
-                <Trash2 className="size-4 text-destructive" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-destructive hover:text-destructive"
+                onClick={() => setDeleteTokenId(tok.id)}
+              >
+                <Trash2 className="size-4" />
               </Button>
             </div>
           ))}
         </CardContent>
       </Card>
+
+      {/* 吊销令牌确认 */}
+      <ConfirmDialog
+        open={!!deleteTokenId}
+        onOpenChange={open => !open && setDeleteTokenId(null)}
+        title={tc('confirmDelete')}
+        description={tc('confirmRevokeToken')}
+        onConfirm={handleDeleteConfirm}
+      />
     </div>
   )
 }

@@ -18,7 +18,8 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
 
   if (res.status === 401) {
     localStorage.removeItem('token')
-    window.location.href = '/login'
+    // Do not hard-redirect here — let React ProtectedRoute handle navigation
+    // to avoid race conditions during login flow
     throw new Error('Unauthorized')
   }
 
