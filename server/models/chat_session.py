@@ -20,6 +20,7 @@ class ChatSession(Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False, index=True)
     title: Mapped[str] = mapped_column(String(200), default="New Chat")
     title_custom: Mapped[bool] = mapped_column(Boolean, default=False)  # 用户是否手动修改过标题
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False)  # 是否公开可读（可分享给未登录用户）
     last_message: Mapped[str | None] = mapped_column(String(500), nullable=True)
     adk_session_id: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
 

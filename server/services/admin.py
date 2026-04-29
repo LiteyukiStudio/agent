@@ -194,7 +194,7 @@ async def add_access_entry(
     """
     entry = AccessListEntry(
         provider_id=provider_id,
-        identity=data.identity,
+        group_name=data.group_name,
         note=data.note,
     )
     db.add(entry)

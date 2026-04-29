@@ -263,7 +263,7 @@ def build_authorization_url(provider: OAuthProvider, redirect_uri: str, state: s
         "response_type": "code",
         "client_id": provider.client_id,
         "redirect_uri": redirect_uri,
-        "scope": "openid profile email",
+        "scope": "openid profile email groups",
         "state": state,
     }
     query = "&".join(f"{k}={v}" for k, v in params.items())
@@ -280,17 +280,18 @@ async def check_access_list(
     provider: OAuthProvider,
     userinfo: dict,
 ) -> bool:
-    """检查用户是否通过提供商的访问名单验证。
+    """检查用户是否通过提供商的 Group 访问名单验证。
 
-    白名单模式：名单为空时允许所有人，名单不为空时仅名单内用户允许。
-    黑名单模式：名单内的用户禁止登录。
+    基于 OIDC userinfo 中的 groups claim 做匹配（如 Casdoor 的组名）。
+    白名单模式：名单为空时允许所有人，名单不为空时仅属于指定 group 的用户允许。
+    黑名单模式：属于指定 group 的用户禁止登录。
     """
-    # 收集用户可能的标识
-    identities = set()
-    for key in ("login", "preferred_username", "name", "email", "sub", "id"):
-        val = userinfo.get(key)
-        if val:
-            identities.add(str(val).lower())
+    # 提取用户的 groups（OIDC groups claim，Casdoor 等支持）
+    raw_groups = userinfo.get("groups", [])
+    if isinstance(raw_groups, str):
+        # 有些 provider 返回逗号分隔字符串
+        raw_groups = [g.strip() for g in raw_groups.split(",") if g.strip()]
+    user_groups = {str(g).lower() for g in raw_groups if g}
 
     result = await db.execute(
         select(AccessListEntry).where(AccessListEntry.provider_id == provider.id),
@@ -298,12 +299,14 @@ async def check_access_list(
     entries = list(result.scalars().all())
 
     if provider.access_mode == "blacklist":
-        return all(entry.identity.lower() not in identities for entry in entries)
+        # 用户属于任何一个黑名单 group 就禁止
+        return all(entry.group_name.lower() not in user_groups for entry in entries)
 
     # 白名单（默认）
     if not entries:
         return True
-    return any(entry.identity.lower() in identities for entry in entries)
+    # 用户属于任何一个白名单 group 就允许
+    return any(entry.group_name.lower() in user_groups for entry in entries)
 
 
 # ---------------------------------------------------------------------------

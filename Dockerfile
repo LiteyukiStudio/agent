@@ -15,7 +15,6 @@ RUN uv sync --no-install-project --frozen
 # 复制项目代码
 COPY model_config.py ./
 COPY root_agent/ ./root_agent/
-COPY gitea_agent/ ./gitea_agent/
 COPY server/ ./server/
 
 # 安装项目

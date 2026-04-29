@@ -53,7 +53,9 @@ export function LoginPage() {
 
   function handleOAuth(providerId: string) {
     const base = import.meta.env.VITE_API_URL || ''
-    window.location.href = `${base}/api/v1/auth/oauth/login/${providerId}`
+    // Pass current frontend origin so the backend can redirect back after OAuth
+    const redirectUrl = encodeURIComponent(window.location.origin)
+    window.location.href = `${base}/api/v1/auth/oauth/login/${providerId}?redirect_url=${redirectUrl}`
   }
 
   return (

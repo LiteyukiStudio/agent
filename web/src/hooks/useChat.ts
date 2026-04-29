@@ -7,6 +7,7 @@ import type { Message, Session, ToolCall } from '@/types/chat'
 interface ApiSession {
   id: string
   title: string
+  is_public: boolean
   last_message: string | null
   created_at: string
   updated_at: string
@@ -65,6 +66,7 @@ export function useChat() {
         const mapped: Session[] = data.map(s => ({
           id: s.id,
           title: s.title,
+          isPublic: s.is_public,
           lastMessage: s.last_message || '',
           updatedAt: new Date(s.updated_at),
           messages: [],
@@ -123,6 +125,7 @@ export function useChat() {
       const newSession: Session = {
         id: data.id,
         title: data.title,
+        isPublic: data.is_public,
         lastMessage: '',
         updatedAt: new Date(data.updated_at),
         messages: [],
@@ -187,28 +190,43 @@ export function useChat() {
 
     const assistantMsgId = `assistant-${Date.now()}`
     let assistantContent = ''
+    let thinkingContent = ''
     const toolCalls: ToolCall[] = []
     let toolCallCounter = 0
+
+    // Helper to build the current assistant message snapshot
+    function buildAssistantMsg(contentOverride?: string): Message {
+      return {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: contentOverride ?? assistantContent,
+        thinking: thinkingContent || undefined,
+        timestamp: new Date(),
+        toolCalls: toolCalls.length > 0 ? [...toolCalls] : undefined,
+      }
+    }
+
+    function updateAssistantMsg(contentOverride?: string) {
+      setMessagesBySession((prev) => {
+        const msgs = (prev[activeSessionId] || []).filter(m => m.id !== assistantMsgId)
+        return {
+          ...prev,
+          [activeSessionId]: [...msgs, buildAssistantMsg(contentOverride)],
+        }
+      })
+    }
 
     try {
       for await (const event of streamSSE(`/api/v1/chat/sessions/${activeSessionId}/messages`, { content: content.trim() })) {
         const eventType = event.event as string
 
-        if (eventType === 'text') {
+        if (eventType === 'thinking') {
+          thinkingContent += event.content as string
+          updateAssistantMsg()
+        }
+        else if (eventType === 'text') {
           assistantContent += event.content as string
-          setMessagesBySession((prev) => {
-            const msgs = (prev[activeSessionId] || []).filter(m => m.id !== assistantMsgId)
-            return {
-              ...prev,
-              [activeSessionId]: [...msgs, {
-                id: assistantMsgId,
-                role: 'assistant',
-                content: assistantContent,
-                timestamp: new Date(),
-                toolCalls: toolCalls.length > 0 ? [...toolCalls] : undefined,
-              }],
-            }
-          })
+          updateAssistantMsg()
         }
         else if (eventType === 'tool_call') {
           toolCallCounter++
@@ -218,19 +236,7 @@ export function useChat() {
             args: (event.args as Record<string, unknown>) || {},
             status: 'running',
           })
-          setMessagesBySession((prev) => {
-            const msgs = (prev[activeSessionId] || []).filter(m => m.id !== assistantMsgId)
-            return {
-              ...prev,
-              [activeSessionId]: [...msgs, {
-                id: assistantMsgId,
-                role: 'assistant',
-                content: assistantContent || 'Calling tools...',
-                timestamp: new Date(),
-                toolCalls: [...toolCalls],
-              }],
-            }
-          })
+          updateAssistantMsg(assistantContent || 'Calling tools...')
         }
         else if (eventType === 'tool_result') {
           const tc = toolCalls.find(t => t.name === event.name)
@@ -238,19 +244,7 @@ export function useChat() {
             tc.result = event.result as string
             tc.status = 'completed'
           }
-          setMessagesBySession((prev) => {
-            const msgs = (prev[activeSessionId] || []).filter(m => m.id !== assistantMsgId)
-            return {
-              ...prev,
-              [activeSessionId]: [...msgs, {
-                id: assistantMsgId,
-                role: 'assistant',
-                content: assistantContent || 'Processing...',
-                timestamp: new Date(),
-                toolCalls: [...toolCalls],
-              }],
-            }
-          })
+          updateAssistantMsg(assistantContent || 'Processing...')
         }
         else if (eventType === 'error') {
           assistantContent += `\n\n**Error:** ${event.message}`
@@ -268,20 +262,8 @@ export function useChat() {
     }
 
     // Final update
-    if (assistantContent || toolCalls.length > 0) {
-      setMessagesBySession((prev) => {
-        const msgs = (prev[activeSessionId] || []).filter(m => m.id !== assistantMsgId)
-        return {
-          ...prev,
-          [activeSessionId]: [...msgs, {
-            id: assistantMsgId,
-            role: 'assistant',
-            content: assistantContent || 'Done.',
-            timestamp: new Date(),
-            toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-          }],
-        }
-      })
+    if (assistantContent || thinkingContent || toolCalls.length > 0) {
+      updateAssistantMsg(assistantContent || 'Done.')
     }
 
     // Update session last message
@@ -294,6 +276,22 @@ export function useChat() {
     setIsLoading(false)
   }, [activeSessionId, isLoading])
 
+  const togglePublic = useCallback(async (sessionId: string) => {
+    const session = sessions.find(s => s.id === sessionId)
+    if (!session)
+      return
+    const newPublic = !session.isPublic
+    try {
+      await apiPatch(`/api/v1/chat/sessions/${sessionId}`, { is_public: newPublic })
+      setSessions(prev => prev.map(s =>
+        s.id === sessionId ? { ...s, isPublic: newPublic } : s,
+      ))
+    }
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update session')
+    }
+  }, [sessions])
+
   return {
     sessions,
     activeSession: activeSessionWithMessages,
@@ -303,5 +301,6 @@ export function useChat() {
     deleteSession,
     renameSession,
     sendMessage,
+    togglePublic,
   }
 }

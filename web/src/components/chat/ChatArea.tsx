@@ -1,6 +1,9 @@
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot } from 'lucide-react'
+import { Bot, Copy, Eye, EyeOff, MoreHorizontal } from 'lucide-react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MessageBubble } from '@/components/chat/MessageBubble'
 import { ChatInput } from '@/components/chat/ChatInput'
@@ -10,9 +13,10 @@ interface ChatAreaProps {
   session: Session | null
   isLoading: boolean
   onSend: (content: string) => void
+  onTogglePublic?: (sessionId: string) => void
 }
 
-export function ChatArea({ session, isLoading, onSend }: ChatAreaProps) {
+export function ChatArea({ session, isLoading, onSend, onTogglePublic }: ChatAreaProps) {
   const { t } = useTranslation('chat')
   const { t: tc } = useTranslation('common')
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -35,11 +39,53 @@ export function ChatArea({ session, isLoading, onSend }: ChatAreaProps) {
     )
   }
 
+  function handleCopyShareLink() {
+    if (!session)
+      return
+    const url = `${window.location.origin}/session/${session.id}/public`
+    navigator.clipboard.writeText(url)
+    toast.success('Share link copied')
+  }
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex h-14 items-center border-b px-6">
+      <div className="flex h-14 items-center justify-between border-b px-6">
         <h2 className="text-sm font-medium truncate">{session.title}</h2>
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button variant="ghost" size="icon" className="size-8 shrink-0">
+                <MoreHorizontal className="size-4" />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem
+              onClick={() => onTogglePublic?.(session.id)}
+            >
+              {session.isPublic
+                ? (
+                    <>
+                      <EyeOff className="mr-2 size-4" />
+                      Set as Private
+                    </>
+                  )
+                : (
+                    <>
+                      <Eye className="mr-2 size-4" />
+                      Set as Public
+                    </>
+                  )}
+            </DropdownMenuItem>
+            {session.isPublic && (
+              <DropdownMenuItem onClick={handleCopyShareLink}>
+                <Copy className="mr-2 size-4" />
+                Copy Share Link
+              </DropdownMenuItem>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* Messages */}

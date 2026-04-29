@@ -8,16 +8,18 @@ from uuid import uuid4
 
 from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.runners import Runner
-from google.adk.sessions import InMemorySessionService
+from google.adk.sessions.database_session_service import DatabaseSessionService
 from google.genai import types
 from sqlalchemy import select
 
+from server.config import settings
 from server.models.chat_session import ChatSession
 from server.models.message import Message
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+    from google.adk.sessions import BaseSessionService
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from server.models.user import User
@@ -27,7 +29,24 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 _runner: Runner | None = None
-_session_service: InMemorySessionService | None = None
+_session_service: BaseSessionService | None = None
+
+# Agent 凭据命名空间白名单：工具通过 tool_context.state 写入的这些 namespace 下的 key
+# 会被自动持久化到 UserConfig 表，实现跨会话访问。
+# 新增 Agent 时在这里添加对应的 namespace。
+PERSIST_CREDENTIAL_NAMESPACES: set[str] = {"gitea", "misskey"}
+
+
+def _get_adk_db_url() -> str:
+    """将项目 DATABASE_URL 转换为 ADK DatabaseSessionService 可用的格式。
+
+    ADK 内部自行创建 async engine，需要 async 驱动的 URL。
+    """
+    url = settings.database_url
+    # 确保使用异步驱动
+    if url.startswith("sqlite:///") and "aiosqlite" not in url:
+        url = url.replace("sqlite:///", "sqlite+aiosqlite:///", 1)
+    return url
 
 
 def get_runner() -> Runner:
@@ -36,7 +55,7 @@ def get_runner() -> Runner:
     if _runner is None:
         from root_agent.agent import root_agent
 
-        _session_service = InMemorySessionService()
+        _session_service = DatabaseSessionService(db_url=_get_adk_db_url())
         _runner = Runner(
             agent=root_agent,
             session_service=_session_service,
@@ -45,7 +64,7 @@ def get_runner() -> Runner:
     return _runner
 
 
-def get_session_service() -> InMemorySessionService:
+def get_session_service() -> BaseSessionService:
     """返回全局 ADK 会话服务。"""
     get_runner()  # 确保已初始化
     assert _session_service is not None
@@ -122,6 +141,50 @@ async def rename_session(
     return chat_session
 
 
+async def update_session(
+    db: AsyncSession,
+    user_id: str,
+    session_id: str,
+    data: object,
+) -> ChatSession | None:
+    """更新会话属性（标题、公开状态等）。"""
+    result = await db.execute(
+        select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == user_id),
+    )
+    chat_session = result.scalar_one_or_none()
+    if chat_session is None:
+        return None
+
+    if hasattr(data, "title") and data.title is not None:
+        chat_session.title = data.title
+        chat_session.title_custom = True
+    if hasattr(data, "is_public") and data.is_public is not None:
+        chat_session.is_public = data.is_public
+
+    await db.commit()
+    await db.refresh(chat_session)
+    return chat_session
+
+
+async def get_public_session(
+    db: AsyncSession,
+    session_id: str,
+) -> tuple[ChatSession, list[Message]] | None:
+    """获取公开会话及其消息（不验证用户身份）。"""
+    result = await db.execute(
+        select(ChatSession).where(ChatSession.id == session_id, ChatSession.is_public.is_(True)),
+    )
+    chat_session = result.scalar_one_or_none()
+    if chat_session is None:
+        return None
+
+    result = await db.execute(
+        select(Message).where(Message.session_id == session_id).order_by(Message.created_at),
+    )
+    messages = list(result.scalars().all())
+    return chat_session, messages
+
+
 # ---------------------------------------------------------------------------
 # 消息持久化
 # ---------------------------------------------------------------------------
@@ -179,7 +242,7 @@ async def stream_response(
     在流开始前检查配额，流结束后记录用量并保存消息。
     """
     from server.services.usage import check_quota, record_usage
-    from server.services.user_config import get_all_raw_configs
+    from server.services.user_config import get_all_raw_configs, set_config
 
     # 前置配额检查
     allowed, reason = await check_quota(db, user)
@@ -194,14 +257,21 @@ async def stream_response(
         user_id=user.id,
         session_id=adk_session_id,
     )
-    if adk_session:
-        # 注入用户 ID 供工具使用
-        adk_session.state["__user_id"] = user.id
-        # 注入用户配置（如 gitea_base_url, gitea_token 等）
-        user_configs = await get_all_raw_configs(db, user.id)
-        for namespace, kv in user_configs.items():
-            for key, value in kv.items():
-                adk_session.state[f"{namespace}_{key}"] = value
+
+    # 如果 ADK session 不存在（后端重启后内存丢失），自动重建
+    if adk_session is None:
+        adk_session = await session_service.create_session(
+            app_name="liteyuki_sre",
+            user_id=user.id,
+            session_id=adk_session_id,
+        )
+
+    # 注入用户配置到 state_delta（通过 run_async 参数传入，确保 ADK 正确持久化）
+    injected_state: dict = {"__user_id": user.id}
+    user_configs = await get_all_raw_configs(db, user.id)
+    for namespace, kv in user_configs.items():
+        for key, value in kv.items():
+            injected_state[f"{namespace}_{key}"] = value
 
     # 保存用户消息
     if session_id:
@@ -225,6 +295,7 @@ async def stream_response(
             user_id=user.id,
             session_id=adk_session_id,
             new_message=message,
+            state_delta=injected_state,
             run_config=RunConfig(streaming_mode=StreamingMode.SSE),
         ):
             # 提取 token 用量（如果事件包含）
@@ -232,14 +303,30 @@ async def stream_response(
                 total_input_tokens += getattr(event.usage_metadata, "prompt_token_count", 0) or 0
                 total_output_tokens += getattr(event.usage_metadata, "candidates_token_count", 0) or 0
 
+            # 检测 state 变更，将凭据类 key 回写到 UserConfig 表（跨会话持久化）
+            if event.actions and event.actions.state_delta:
+                for state_key, state_value in event.actions.state_delta.items():
+                    # 解析 namespace_key 格式
+                    parts = state_key.split("_", 1)
+                    if len(parts) == 2 and parts[0] in PERSIST_CREDENTIAL_NAMESPACES:
+                        namespace, key = parts
+                        is_secret = key in ("token", "password", "secret")
+                        await set_config(
+                            db, user.id, namespace, key,
+                            str(state_value), is_secret=is_secret,
+                        )
+
             # 提取内容
             if event.content and event.content.parts:
                 for part in event.content.parts:
                     if part.text:
-                        assistant_text += part.text
+                        # 区分思考过程和正式回复
+                        is_thinking = bool(part.thought)
+                        if not is_thinking:
+                            assistant_text += part.text
                         sse_data = json.dumps(
                             {
-                                "event": "text",
+                                "event": "thinking" if is_thinking else "text",
                                 "author": event.author or "assistant",
                                 "content": part.text,
                             }
@@ -279,6 +366,24 @@ async def stream_response(
                         )
                         yield f"data: {sse_data}\n\n"
 
+        # 兜底：流结束后从 ADK session state 回写凭据到 UserConfig
+        # （防止 state_delta 在某些情况下未触发）
+        final_session = await session_service.get_session(
+            app_name="liteyuki_sre",
+            user_id=user.id,
+            session_id=adk_session_id,
+        )
+        if final_session:
+            for state_key, state_value in final_session.state.items():
+                parts = state_key.split("_", 1)
+                if len(parts) == 2 and parts[0] in PERSIST_CREDENTIAL_NAMESPACES and state_value:
+                    namespace, key = parts
+                    is_secret = key in ("token", "password", "secret")
+                    await set_config(
+                        db, user.id, namespace, key,
+                        str(state_value), is_secret=is_secret,
+                    )
+
         # 记录用量
         if total_input_tokens > 0 or total_output_tokens > 0:
             await record_usage(
@@ -305,12 +410,16 @@ async def stream_response(
             if chat_session:
                 if assistant_text:
                     chat_session.last_message = assistant_text[:200]
-                # 自动生成标题：仅在用户未手动修改时更新
-                if not chat_session.title_custom and content.strip():
-                    auto_title = content.strip()[:30]
-                    if len(content.strip()) > 30:
-                        auto_title += "..."
-                    chat_session.title = auto_title
+                # AI 自动生成标题：仅在用户未手动修改且标题仍为默认值时
+                if not chat_session.title_custom and chat_session.title == "New Chat" and content.strip():
+                    from server.services.title_gen import generate_title
+
+                    ai_title = await generate_title(content, assistant_text)
+                    if ai_title:
+                        chat_session.title = ai_title
+                    else:
+                        # 兜底：用脱敏的截取
+                        chat_session.title = "新对话"
                 await db.commit()
 
         # 获取更新后的标题（用于通知前端）

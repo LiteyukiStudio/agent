@@ -23,7 +23,21 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem('token'))
+  const [token, setToken] = useState<string | null>(() => {
+    // OAuth 回调会在 URL 中带上 oauth_token 参数
+    const params = new URLSearchParams(window.location.search)
+    const oauthToken = params.get('oauth_token')
+    if (oauthToken) {
+      localStorage.setItem('token', oauthToken)
+      // 清理 URL 中的 token 参数（安全 + 美观）
+      params.delete('oauth_token')
+      const clean = params.toString()
+      const newUrl = window.location.pathname + (clean ? `?${clean}` : '')
+      window.history.replaceState({}, '', newUrl)
+      return oauthToken
+    }
+    return localStorage.getItem('token')
+  })
   const [loading, setLoading] = useState(true)
 
   const fetchUser = useCallback(async () => {

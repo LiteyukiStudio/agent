@@ -12,6 +12,7 @@ class SessionResponse(BaseModel):
 
     id: str
     title: str
+    is_public: bool = False
     last_message: str | None = None
     created_at: datetime
     updated_at: datetime
@@ -25,10 +26,11 @@ class SessionCreate(BaseModel):
     title: str = "New Chat"
 
 
-class SessionRename(BaseModel):
-    """重命名聊天会话的请求体。"""
+class SessionUpdate(BaseModel):
+    """更新聊天会话的请求体（所有字段可选）。"""
 
-    title: str
+    title: str | None = None
+    is_public: bool | None = None
 
 
 class MessageSend(BaseModel):
@@ -50,8 +52,11 @@ class MessageResponse(BaseModel):
     model_config = {"from_attributes": True}
 
 
-class MessageEvent(BaseModel):
-    """Agent 响应流中的单个 SSE 事件。"""
+class PublicSessionResponse(BaseModel):
+    """公开会话的完整数据（含消息列表）。"""
 
-    event: str  # 'text', 'tool_call', 'done', 'error'
-    data: str
+    id: str
+    title: str
+    messages: list[MessageResponse]
+    created_at: datetime
+    updated_at: datetime

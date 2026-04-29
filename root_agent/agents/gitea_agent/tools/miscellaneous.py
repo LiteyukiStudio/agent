@@ -6,16 +6,18 @@
 
 from __future__ import annotations
 
+from google.adk.tools import ToolContext
+
 from ..client import GiteaClient
 
 
-def get_gitea_version() -> dict:
+def get_gitea_version(tool_context: ToolContext) -> dict:
     """Get the Gitea server version."""
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get("/version")
 
 
-def render_markdown(text: str, mode: str = "gfm", wiki: bool = False) -> dict:
+def render_markdown(text: str, tool_context: ToolContext, mode: str = "gfm", wiki: bool = False) -> dict:
     """Render a Markdown string to HTML using Gitea's renderer.
 
     Args:
@@ -23,13 +25,13 @@ def render_markdown(text: str, mode: str = "gfm", wiki: bool = False) -> dict:
         mode: Render mode — "gfm" (GitHub Flavored) or "comment" or "wiki"
         wiki: Whether to parse wiki links
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.post("/markdown", json_data={"Text": text, "Mode": mode, "Wiki": wiki})
 
 
-def get_signing_key() -> dict:
+def get_signing_key(tool_context: ToolContext) -> dict:
     """Get the Gitea server's default GPG signing key."""
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get("/signing-key.gpg")
 
 

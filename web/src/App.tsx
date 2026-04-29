@@ -3,6 +3,7 @@ import { Toaster } from 'sonner'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { LoginPage } from '@/pages/LoginPage'
 import { ChatPage } from '@/pages/ChatPage'
+import { PublicSessionPage } from '@/pages/PublicSessionPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { AdminLayout } from '@/pages/admin/AdminLayout'
 import { UsersPage } from '@/pages/admin/UsersPage'
@@ -16,8 +17,20 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginPage />} />
 
+        {/* Public session view (no auth required) */}
+        <Route path="/session/:sessionId/public" element={<PublicSessionPage />} />
+
+        {/* Chat routes */}
         <Route
           path="/"
+          element={(
+            <ProtectedRoute>
+              <ChatPage />
+            </ProtectedRoute>
+          )}
+        />
+        <Route
+          path="/session/:sessionId"
           element={(
             <ProtectedRoute>
               <ChatPage />

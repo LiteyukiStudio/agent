@@ -10,6 +10,7 @@ export interface Message {
   id: string
   role: 'user' | 'assistant'
   content: string
+  thinking?: string
   timestamp: Date
   toolCalls?: ToolCall[]
 }
@@ -17,6 +18,7 @@ export interface Message {
 export interface Session {
   id: string
   title: string
+  isPublic: boolean
   lastMessage: string
   updatedAt: Date
   messages: Message[]

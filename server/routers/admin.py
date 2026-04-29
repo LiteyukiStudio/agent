@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
+from server.config import settings
 from server.deps import get_db, require_admin
 from server.schemas.admin import (
     AccessListEntryCreate,
@@ -21,9 +22,17 @@ from server.services import admin as admin_service
 if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
+    from server.models.oauth_provider import OAuthProvider
     from server.models.user import User
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
+
+
+def _provider_response(provider: OAuthProvider) -> OAuthProviderResponse:
+    """将 ORM 对象转为响应模型，附加 callback_url。"""
+    resp = OAuthProviderResponse.model_validate(provider)
+    resp.callback_url = f"{settings.server_host}/api/v1/auth/oauth/callback/{provider.id}"
+    return resp
 
 
 # ---------------------------------------------------------------------------
@@ -38,7 +47,7 @@ async def list_providers(
 ) -> list[OAuthProviderResponse]:
     """列出所有 OAuth 提供商（仅管理员）。"""
     providers = await admin_service.list_providers(db)
-    return [OAuthProviderResponse.model_validate(p) for p in providers]
+    return [_provider_response(p) for p in providers]
 
 
 @router.post("/oauth-providers", response_model=OAuthProviderResponse, status_code=status.HTTP_201_CREATED)
@@ -49,7 +58,7 @@ async def create_provider(
 ) -> OAuthProviderResponse:
     """创建新的 OAuth 提供商，自动进行 OIDC 发现（仅管理员）。"""
     provider = await admin_service.create_provider(db, body)
-    return OAuthProviderResponse.model_validate(provider)
+    return _provider_response(provider)
 
 
 @router.patch("/oauth-providers/{provider_id}", response_model=OAuthProviderResponse)
@@ -63,7 +72,7 @@ async def update_provider(
     provider = await admin_service.update_provider(db, provider_id, body)
     if provider is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found")
-    return OAuthProviderResponse.model_validate(provider)
+    return _provider_response(provider)
 
 
 @router.delete("/oauth-providers/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)

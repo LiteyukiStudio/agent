@@ -8,7 +8,14 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from starlette.responses import StreamingResponse
 
 from server.deps import get_current_user, get_db
-from server.schemas.chat import MessageResponse, MessageSend, SessionCreate, SessionRename, SessionResponse
+from server.schemas.chat import (
+    MessageResponse,
+    MessageSend,
+    PublicSessionResponse,
+    SessionCreate,
+    SessionResponse,
+    SessionUpdate,
+)
 from server.services import chat as chat_service
 
 if TYPE_CHECKING:
@@ -53,14 +60,14 @@ async def delete_session(
 
 
 @router.patch("/sessions/{session_id}", response_model=SessionResponse)
-async def rename_session(
+async def update_session(
     session_id: str,
-    body: SessionRename,
+    body: SessionUpdate,
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> SessionResponse:
-    """重命名聊天会话（标记为用户自定义标题，不再自动更新）。"""
-    session = await chat_service.rename_session(db, user.id, session_id, body.title)
+    """更新聊天会话（标题、公开状态等）。"""
+    session = await chat_service.update_session(db, user.id, session_id, body)
     if session is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
     return SessionResponse.model_validate(session)
@@ -77,6 +84,25 @@ async def get_messages(
     return [MessageResponse.model_validate(m) for m in messages]
 
 
+@router.get("/sessions/{session_id}/public", response_model=PublicSessionResponse)
+async def get_public_session(
+    session_id: str,
+    db: AsyncSession = Depends(get_db),
+) -> PublicSessionResponse:
+    """获取公开会话的消息（不需要登录）。"""
+    result = await chat_service.get_public_session(db, session_id)
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found or not public")
+    session, messages = result
+    return PublicSessionResponse(
+        id=session.id,
+        title=session.title,
+        messages=[MessageResponse.model_validate(m) for m in messages],
+        created_at=session.created_at,
+        updated_at=session.updated_at,
+    )
+
+
 @router.post("/sessions/{session_id}/messages")
 async def send_message(
     session_id: str,
@@ -85,7 +111,6 @@ async def send_message(
     db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
     """发送消息并通过 SSE 流式返回 Agent 响应。"""
-    # 验证会话所有权
     sessions = await chat_service.list_sessions(db, user.id)
     chat_session = next((s for s in sessions if s.id == session_id), None)
     if chat_session is None:

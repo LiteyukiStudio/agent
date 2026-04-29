@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2 } from 'lucide-react'
+import { Copy, Info, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -18,6 +18,7 @@ interface OAuthProvider {
   client_id: string
   enabled: boolean
   access_mode: string
+  callback_url: string | null
   created_at: string
 }
 
@@ -81,6 +82,12 @@ export function OAuthPage() {
               <Input placeholder="Issuer URL (e.g. https://git.example.com)" value={form.issuer_url} onChange={e => setForm(f => ({ ...f, issuer_url: e.target.value }))} />
               <Input placeholder="Client ID" value={form.client_id} onChange={e => setForm(f => ({ ...f, client_id: e.target.value }))} />
               <Input placeholder="Client Secret" type="password" value={form.client_secret} onChange={e => setForm(f => ({ ...f, client_secret: e.target.value }))} />
+              <div className="flex items-start gap-2 rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">
+                <Info className="mt-0.5 size-3.5 shrink-0" />
+                <span>
+                  Callback URL will be generated after creation. Set it in your OAuth app as the redirect URI.
+                </span>
+              </div>
             </div>
             <DialogFooter>
               <DialogClose
@@ -101,6 +108,7 @@ export function OAuthPage() {
               <TableRow>
                 <TableHead>Name</TableHead>
                 <TableHead>Issuer</TableHead>
+                <TableHead>Callback URL</TableHead>
                 <TableHead>Access Mode</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="w-20" />
@@ -111,6 +119,24 @@ export function OAuthPage() {
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">{p.name}</TableCell>
                   <TableCell className="max-w-[200px] truncate text-muted-foreground">{p.issuer_url}</TableCell>
+                  <TableCell>
+                    {p.callback_url && (
+                      <div className="flex items-center gap-1">
+                        <code className="max-w-[200px] truncate text-xs text-muted-foreground">{p.callback_url}</code>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-6 shrink-0"
+                          onClick={() => {
+                            navigator.clipboard.writeText(p.callback_url!)
+                            toast.success('Callback URL copied')
+                          }}
+                        >
+                          <Copy className="size-3" />
+                        </Button>
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>
                     <Badge variant="outline">{p.access_mode}</Badge>
                   </TableCell>
@@ -133,7 +159,7 @@ export function OAuthPage() {
               ))}
               {providers.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground">
                     {tc('noData')}
                   </TableCell>
                 </TableRow>

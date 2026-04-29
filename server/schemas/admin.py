@@ -44,6 +44,7 @@ class OAuthProviderResponse(BaseModel):
     authorization_endpoint: str | None = None
     token_endpoint: str | None = None
     userinfo_endpoint: str | None = None
+    callback_url: str | None = None  # 由 router 层填充
     created_at: datetime
     updated_at: datetime
 
@@ -56,18 +57,18 @@ class OAuthProviderResponse(BaseModel):
 
 
 class AccessListEntryCreate(BaseModel):
-    """添加名单条目。"""
+    """添加 Group 名单条目。"""
 
-    identity: str  # 用户名、邮箱或 OAuth ID
+    group_name: str  # OIDC group 名称
     note: str | None = None
 
 
 class AccessListEntryResponse(BaseModel):
-    """名单条目响应。"""
+    """Group 名单条目响应。"""
 
     id: str
     provider_id: str
-    identity: str
+    group_name: str
     note: str | None = None
     created_at: datetime
 

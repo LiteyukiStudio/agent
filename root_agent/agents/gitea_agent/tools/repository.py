@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from google.adk.tools import ToolContext
+
 from ..client import GiteaClient
 
 # ---------------------------------------------------------------------------
@@ -14,6 +16,7 @@ from ..client import GiteaClient
 
 
 def search_repos(
+    tool_context: ToolContext,
     keyword: str = "",
     owner: str = "",
     page: int = 1,
@@ -36,23 +39,24 @@ def search_repos(
         params["q"] = keyword
     if owner:
         params["owner"] = owner
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get("/repos/search", params=params)
 
 
-def get_repo(owner: str, repo: str) -> dict:
+def get_repo(owner: str, repo: str, tool_context: ToolContext) -> dict:
     """Get detailed information about a repository.
 
     Args:
         owner: Repository owner
         repo: Repository name
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get(f"/repos/{owner}/{repo}")
 
 
 def create_repo(
     name: str,
+    tool_context: ToolContext,
     description: str = "",
     private: bool = False,
     auto_init: bool = True,
@@ -76,24 +80,24 @@ def create_repo(
         "auto_init": auto_init,
         "default_branch": default_branch,
     }
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         if org:
             return c.post(f"/orgs/{org}/repos", json_data=data)
         return c.post("/user/repos", json_data=data)
 
 
-def delete_repo(owner: str, repo: str) -> dict:
+def delete_repo(owner: str, repo: str, tool_context: ToolContext) -> dict:
     """Delete a repository. This is IRREVERSIBLE.
 
     Args:
         owner: Repository owner
         repo: Repository name
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.delete(f"/repos/{owner}/{repo}")
 
 
-def list_branches(owner: str, repo: str, page: int = 1, limit: int = 20) -> dict:
+def list_branches(owner: str, repo: str, tool_context: ToolContext, page: int = 1, limit: int = 20) -> dict:
     """List branches in a repository.
 
     Args:
@@ -102,11 +106,11 @@ def list_branches(owner: str, repo: str, page: int = 1, limit: int = 20) -> dict
         page: Page number
         limit: Results per page
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get(f"/repos/{owner}/{repo}/branches", params={"page": page, "limit": limit})
 
 
-def get_file_content(owner: str, repo: str, filepath: str, ref: str = "") -> dict:
+def get_file_content(owner: str, repo: str, filepath: str, tool_context: ToolContext, ref: str = "") -> dict:
     """Get the content of a file in a repository.
 
     Args:
@@ -118,11 +122,11 @@ def get_file_content(owner: str, repo: str, filepath: str, ref: str = "") -> dic
     params: dict = {}
     if ref:
         params["ref"] = ref
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get(f"/repos/{owner}/{repo}/contents/{filepath}", params=params)
 
 
-def list_releases(owner: str, repo: str, page: int = 1, limit: int = 10) -> dict:
+def list_releases(owner: str, repo: str, tool_context: ToolContext, page: int = 1, limit: int = 10) -> dict:
     """List releases in a repository.
 
     Args:
@@ -131,7 +135,7 @@ def list_releases(owner: str, repo: str, page: int = 1, limit: int = 10) -> dict
         page: Page number
         limit: Results per page
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get(f"/repos/{owner}/{repo}/releases", params={"page": page, "limit": limit})
 
 
@@ -143,6 +147,7 @@ def list_releases(owner: str, repo: str, page: int = 1, limit: int = 10) -> dict
 def list_pull_requests(
     owner: str,
     repo: str,
+    tool_context: ToolContext,
     state: str = "open",
     sort: str = "newest",
     page: int = 1,
@@ -158,14 +163,14 @@ def list_pull_requests(
         page: Page number
         limit: Results per page
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get(
             f"/repos/{owner}/{repo}/pulls",
             params={"state": state, "sort": sort, "page": page, "limit": limit},
         )
 
 
-def get_pull_request(owner: str, repo: str, index: int) -> dict:
+def get_pull_request(owner: str, repo: str, index: int, tool_context: ToolContext) -> dict:
     """Get details of a pull request.
 
     Args:
@@ -173,7 +178,7 @@ def get_pull_request(owner: str, repo: str, index: int) -> dict:
         repo: Repository name
         index: PR number
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get(f"/repos/{owner}/{repo}/pulls/{index}")
 
 
@@ -183,6 +188,7 @@ def create_pull_request(
     title: str,
     head: str,
     base: str,
+    tool_context: ToolContext,
     body: str = "",
     assignees: list[str] | None = None,
     labels: list[int] | None = None,
@@ -206,16 +212,12 @@ def create_pull_request(
         data["assignees"] = assignees
     if labels:
         data["labels"] = labels
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.post(f"/repos/{owner}/{repo}/pulls", json_data=data)
 
 
 def merge_pull_request(
-    owner: str,
-    repo: str,
-    index: int,
-    merge_method: str = "merge",
-    message: str = "",
+    owner: str, repo: str, index: int, tool_context: ToolContext, merge_method: str = "merge", message: str = ""
 ) -> dict:
     """Merge a pull request.
 
@@ -229,11 +231,13 @@ def merge_pull_request(
     data: dict = {"Do": merge_method}
     if message:
         data["merge_message_field"] = message
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.post(f"/repos/{owner}/{repo}/pulls/{index}/merge", json_data=data)
 
 
-def list_pr_commits(owner: str, repo: str, index: int, page: int = 1, limit: int = 20) -> dict:
+def list_pr_commits(
+    owner: str, repo: str, index: int, tool_context: ToolContext, page: int = 1, limit: int = 20
+) -> dict:
     """List commits in a pull request.
 
     Args:
@@ -243,7 +247,7 @@ def list_pr_commits(owner: str, repo: str, index: int, page: int = 1, limit: int
         page: Page number
         limit: Results per page
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get(f"/repos/{owner}/{repo}/pulls/{index}/commits", params={"page": page, "limit": limit})
 
 

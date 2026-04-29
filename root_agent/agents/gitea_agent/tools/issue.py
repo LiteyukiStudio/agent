@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+from google.adk.tools import ToolContext
+
 from ..client import GiteaClient
 
 # ---------------------------------------------------------------------------
@@ -16,6 +18,7 @@ from ..client import GiteaClient
 def list_repo_issues(
     owner: str,
     repo: str,
+    tool_context: ToolContext,
     state: str = "open",
     labels: str = "",
     page: int = 1,
@@ -34,11 +37,11 @@ def list_repo_issues(
     params: dict = {"state": state, "page": page, "limit": limit, "type": "issues"}
     if labels:
         params["labels"] = labels
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get(f"/repos/{owner}/{repo}/issues", params=params)
 
 
-def get_issue(owner: str, repo: str, index: int) -> dict:
+def get_issue(owner: str, repo: str, index: int, tool_context: ToolContext) -> dict:
     """Get a single issue by its index number.
 
     Args:
@@ -46,7 +49,7 @@ def get_issue(owner: str, repo: str, index: int) -> dict:
         repo: Repository name
         index: Issue number (the #N shown in the UI)
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get(f"/repos/{owner}/{repo}/issues/{index}")
 
 
@@ -54,6 +57,7 @@ def create_issue(
     owner: str,
     repo: str,
     title: str,
+    tool_context: ToolContext,
     body: str = "",
     labels: list[int] | None = None,
     assignees: list[str] | None = None,
@@ -79,7 +83,7 @@ def create_issue(
         data["assignees"] = assignees
     if milestone is not None:
         data["milestone"] = milestone
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.post(f"/repos/{owner}/{repo}/issues", json_data=data)
 
 
@@ -87,6 +91,7 @@ def edit_issue(
     owner: str,
     repo: str,
     index: int,
+    tool_context: ToolContext,
     title: str | None = None,
     body: str | None = None,
     state: str | None = None,
@@ -116,7 +121,7 @@ def edit_issue(
         data["assignees"] = assignees
     if milestone is not None:
         data["milestone"] = milestone
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.patch(f"/repos/{owner}/{repo}/issues/{index}", json_data=data)
 
 
@@ -125,7 +130,9 @@ def edit_issue(
 # ---------------------------------------------------------------------------
 
 
-def list_issue_comments(owner: str, repo: str, index: int, page: int = 1, limit: int = 20) -> dict:
+def list_issue_comments(
+    owner: str, repo: str, index: int, tool_context: ToolContext, page: int = 1, limit: int = 20
+) -> dict:
     """List comments on an issue.
 
     Args:
@@ -135,11 +142,11 @@ def list_issue_comments(owner: str, repo: str, index: int, page: int = 1, limit:
         page: Page number
         limit: Results per page
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get(f"/repos/{owner}/{repo}/issues/{index}/comments", params={"page": page, "limit": limit})
 
 
-def create_issue_comment(owner: str, repo: str, index: int, body: str) -> dict:
+def create_issue_comment(owner: str, repo: str, index: int, body: str, tool_context: ToolContext) -> dict:
     """Add a comment to an issue.
 
     Args:
@@ -148,7 +155,7 @@ def create_issue_comment(owner: str, repo: str, index: int, body: str) -> dict:
         index: Issue number
         body: Comment content (Markdown supported)
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.post(f"/repos/{owner}/{repo}/issues/{index}/comments", json_data={"body": body})
 
 
@@ -157,7 +164,7 @@ def create_issue_comment(owner: str, repo: str, index: int, body: str) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def list_issue_labels(owner: str, repo: str, index: int) -> dict:
+def list_issue_labels(owner: str, repo: str, index: int, tool_context: ToolContext) -> dict:
     """List labels on an issue.
 
     Args:
@@ -165,11 +172,11 @@ def list_issue_labels(owner: str, repo: str, index: int) -> dict:
         repo: Repository name
         index: Issue number
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.get(f"/repos/{owner}/{repo}/issues/{index}/labels")
 
 
-def add_issue_labels(owner: str, repo: str, index: int, labels: list[int]) -> dict:
+def add_issue_labels(owner: str, repo: str, index: int, labels: list[int], tool_context: ToolContext) -> dict:
     """Add labels to an issue.
 
     Args:
@@ -178,11 +185,11 @@ def add_issue_labels(owner: str, repo: str, index: int, labels: list[int]) -> di
         index: Issue number
         labels: List of label IDs to add
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.post(f"/repos/{owner}/{repo}/issues/{index}/labels", json_data={"labels": labels})
 
 
-def remove_issue_label(owner: str, repo: str, index: int, label_id: int) -> dict:
+def remove_issue_label(owner: str, repo: str, index: int, label_id: int, tool_context: ToolContext) -> dict:
     """Remove a label from an issue.
 
     Args:
@@ -191,7 +198,7 @@ def remove_issue_label(owner: str, repo: str, index: int, label_id: int) -> dict
         index: Issue number
         label_id: ID of the label to remove
     """
-    with GiteaClient() as c:
+    with GiteaClient.from_context(tool_context) as c:
         return c.delete(f"/repos/{owner}/{repo}/issues/{index}/labels/{label_id}")
 
 

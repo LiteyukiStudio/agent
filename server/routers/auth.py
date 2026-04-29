@@ -84,8 +84,16 @@ async def login_with_password(
 
 
 @router.get("/oauth/login/{provider_id}")
-async def oauth_login(provider_id: str, db: AsyncSession = Depends(get_db)) -> RedirectResponse:
-    """重定向到 OAuth 提供商的授权页面。"""
+async def oauth_login(
+    provider_id: str,
+    redirect_url: str = "",
+    db: AsyncSession = Depends(get_db),
+) -> RedirectResponse:
+    """重定向到 OAuth 提供商的授权页面。
+
+    Args:
+        redirect_url: 登录成功后跳转回的前端地址，会在回调后附带 token 参数重定向回去。
+    """
     result = await db.execute(
         select(OAuthProvider).where(OAuthProvider.id == provider_id, OAuthProvider.enabled.is_(True)),
     )
@@ -99,7 +107,7 @@ async def oauth_login(provider_id: str, db: AsyncSession = Depends(get_db)) -> R
         )
 
     state = secrets.token_urlsafe(32)
-    _oauth_states[state] = provider_id
+    _oauth_states[state] = {"provider_id": provider_id, "redirect_url": redirect_url}
     redirect_uri = f"{settings.server_host}/api/v1/auth/oauth/callback/{provider_id}"
     url = build_authorization_url(provider, redirect_uri, state)
     return RedirectResponse(url=url)
@@ -111,11 +119,15 @@ async def oauth_callback(
     code: str,
     state: str = "",
     db: AsyncSession = Depends(get_db),
-) -> TokenResponse:
-    """处理 OAuth 回调：交换授权码、创建/查找用户、返回 JWT。"""
-    # 验证 state
-    if state and _oauth_states.pop(state, None) != provider_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state")
+) -> RedirectResponse:
+    """处理 OAuth 回调：交换授权码、创建/查找用户、带 token 重定向回前端。"""
+    # 验证 state 并取出前端跳转地址
+    frontend_redirect = ""
+    if state:
+        state_data = _oauth_states.pop(state, None)
+        if state_data is None or state_data["provider_id"] != provider_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid OAuth state")
+        frontend_redirect = state_data.get("redirect_url", "")
 
     result = await db.execute(select(OAuthProvider).where(OAuthProvider.id == provider_id))
     provider = result.scalar_one_or_none()
@@ -142,7 +154,12 @@ async def oauth_callback(
 
     user = await find_or_create_user(db, provider_id, userinfo)
     token = create_jwt(user)
-    return TokenResponse(access_token=token)
+
+    # 带 token 重定向回前端
+    # 优先用前端传来的 redirect_url，否则用 CORS_ORIGINS 的第一个，最后兜底 /
+    target = frontend_redirect or (settings.cors_origins[0] if settings.cors_origins else "")
+    separator = "&" if "?" in target else "?"
+    return RedirectResponse(url=f"{target}{separator}oauth_token={token}")
 
 
 # ---------------------------------------------------------------------------
