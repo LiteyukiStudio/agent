@@ -6,17 +6,28 @@
   "bin": {
     "liteyuki-agent": "./dist/cli.js"
   },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "dev": "tsx src/cli.tsx",
-    "build": "tsup src/cli.tsx --format esm --dts",
+    "build": "tsup src/cli.tsx --format esm --target node20 --external react --no-splitting",
+    "compile": "bun build src/cli.tsx --compile --outfile liteyuki-agent",
     "lint": "tsc --noEmit"
   },
   "keywords": [
     "liteyuki",
     "agent",
     "local",
-    "cli"
+    "cli",
+    "devops"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/snowykami/adk-demo",
+    "directory": "local_agent"
+  },
   "license": "MIT",
   "dependencies": {
     "chalk": "^5.4.0",

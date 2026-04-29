@@ -24,6 +24,7 @@ export interface ConnectionEvents {
 
 let ws: WebSocket | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let pingTimer: ReturnType<typeof setInterval> | null = null;
 let shouldReconnect = false;
 let currentUrl = "";
 let currentToken = "";
@@ -73,12 +74,18 @@ function doConnect(): void {
 
   events?.onStatusChange("connecting");
 
-  const separator = currentUrl.includes("?") ? "&" : "?";
-  const fullUrl = `${currentUrl}${separator}token=${currentToken}`;
-  ws = new WebSocket(fullUrl);
+  // currentUrl 已包含所有 query 参数（token, device_id, device_name）
+  ws = new WebSocket(currentUrl);
 
   ws.on("open", () => {
     events?.onStatusChange("connected");
+    // 每 30 秒发 ping 保持连接（防止代理/nginx 超时断开）
+    if (pingTimer) clearInterval(pingTimer);
+    pingTimer = setInterval(() => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.ping();
+      }
+    }, 30000);
   });
 
   ws.on("message", (data) => {
@@ -93,6 +100,7 @@ function doConnect(): void {
 
   ws.on("close", () => {
     ws = null;
+    if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
     events?.onStatusChange("disconnected");
     scheduleReconnect();
   });

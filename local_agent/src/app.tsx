@@ -11,7 +11,15 @@ import {
   type ConnectionStatus,
 } from "./connection.js";
 import { getConfig, setConnection, clearConnection, getConfigPath } from "./config.js";
-import { deviceLogin, browserLogin, getHostname, type LoginResult } from "./auth.js";
+import {
+  browserLogin,
+  deviceLogin,
+  getDeviceName,
+  normalizeUrl,
+  wsUrl,
+  type LoginResult,
+} from "./auth.js";
+import { getDeviceId } from "./config.js";
 import type { ToolRequest, ToolResponse } from "./tools.js";
 
 const DEFAULT_SERVER = "https://flow.liteyuki.org";
@@ -26,11 +34,11 @@ function timestamp(): string {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
 }
 
-/** 将 HTTPS URL 转为 WSS URL，附带 hostname */
-function toWsUrl(httpUrl: string, token: string, host: string): string {
-  const base = httpUrl.replace(/\/+$/, "");
-  const wsBase = base.replace(/^http/, "ws");
-  return `${wsBase}/ws/local-agent?token=${encodeURIComponent(token)}&hostname=${encodeURIComponent(host)}`;
+/** 从 base URL + token + deviceId + deviceName 构建完整 WS 连接地址 */
+function buildWsUrl(baseUrl: string, token: string): string {
+  const deviceId = getDeviceId();
+  const deviceName = getDeviceName();
+  return wsUrl(baseUrl, `/ws/local-agent?token=${encodeURIComponent(token)}&device_id=${encodeURIComponent(deviceId)}&device_name=${encodeURIComponent(deviceName)}`);
 }
 
 export function App() {
@@ -62,27 +70,27 @@ export function App() {
         else if (s === "disconnected") addLog("info", "Disconnected");
       },
       onRequest: (req) => {
-        addLog("request", `← ${req.tool}(${JSON.stringify(req.args).slice(0, 80)})`);
+        addLog("request", `\u2190 ${req.tool}(${JSON.stringify(req.args).slice(0, 80)})`);
       },
       onResponse: (res) => {
         if (res.error) {
-          addLog("error", `→ Error: ${res.error.slice(0, 100)}`);
+          addLog("error", `\u2192 Error: ${res.error.slice(0, 100)}`);
         } else {
-          addLog("response", `→ OK (${res.result?.length || 0} chars)`);
+          addLog("response", `\u2192 OK (${res.result?.length || 0} chars)`);
         }
       },
       onConfirmRequired: (req, approve, reject) => {
         setPendingConfirm({ request: req, approve, reject });
-        addLog("warn", `⚠ Dangerous command: ${(req.args.command as string).slice(0, 80)}`);
+        addLog("warn", `\u26a0 Dangerous command: ${(req.args.command as string).slice(0, 80)}`);
       },
     });
 
     // Auto-connect if configured
     const cfg = getConfig();
-    if (cfg.serverUrl && cfg.token && cfg.autoConnect) {
-      const host = cfg.hostname || getHostname();
-      addLog("info", `Auto-connecting as "${host}" to ${cfg.serverUrl}...`);
-      connect(cfg.serverUrl, cfg.token);
+    if (cfg.baseUrl && cfg.token && cfg.autoConnect) {
+      addLog("info", `Auto-connecting as "${getDeviceName()}" to ${cfg.baseUrl}...`);
+      const url = buildWsUrl(cfg.baseUrl, cfg.token);
+      connect(url, cfg.token);
     } else {
       addLog("info", 'Type "/login" to authenticate, or "/help" for commands');
     }
@@ -102,28 +110,31 @@ export function App() {
     }
   });
 
+  /** 连接到服务器 */
+  function doConnect(baseUrl: string, token: string) {
+    const url = buildWsUrl(baseUrl, token);
+    setConnection(baseUrl, token);
+    addLog("info", `Connecting as "${getDeviceName()}" to ${baseUrl}...`);
+    connect(url, token);
+  }
+
   async function handleLogin(serverUrl: string, useDeviceCode: boolean = false) {
     setIsLoggingIn(true);
-    const host = getHostname();
-    addLog("info", `Authenticating as "${host}" with ${serverUrl}...`);
+    const base = normalizeUrl(serverUrl);
+    addLog("info", `Authenticating as "${getDeviceName()}" with ${base}...`);
 
     let result: LoginResult | null = null;
 
     if (useDeviceCode) {
-      // Device Code 模式（无浏览器环境）
       addLog("info", "Using device code mode...");
-      result = await deviceLogin(serverUrl, (msg) => addLog("info", msg));
+      result = await deviceLogin(base, (msg) => addLog("info", msg));
     } else {
-      // 快速浏览器模式（默认）
-      result = await browserLogin(serverUrl, (msg) => addLog("info", msg));
+      result = await browserLogin(base, (msg) => addLog("info", msg));
     }
 
     if (result) {
-      const wsUrl = toWsUrl(result.serverUrl, result.token, host);
-      setConnection(wsUrl, result.token, host);
       addLog("success", "Authentication successful! Token saved.");
-      addLog("info", `Connecting as "${host}"...`);
-      connect(wsUrl, result.token);
+      doConnect(result.baseUrl, result.token);
     } else {
       addLog("error", "Authentication failed or timed out.");
     }
@@ -136,7 +147,6 @@ export function App() {
     const trimmed = value.trim();
     if (!trimmed) return;
 
-    // Parse commands
     if (trimmed.startsWith("/")) {
       const parts = trimmed.split(/\s+/);
       const cmd = parts[0]!.toLowerCase();
@@ -147,7 +157,6 @@ export function App() {
             addLog("warn", "Already logging in...");
             return;
           }
-          // /login [url] [--device]
           const useDevice = parts.includes("--device");
           const serverUrl = parts.find((p, i) => i > 0 && !p.startsWith("--")) || DEFAULT_SERVER;
           handleLogin(serverUrl, useDevice);
@@ -155,16 +164,15 @@ export function App() {
         }
 
         case "/connect": {
-          const url = parts[1];
+          // /connect <base-url> <token>
+          const rawUrl = parts[1];
           const tkn = parts[2];
-          if (!url || !tkn) {
-            addLog("error", "Usage: /connect <ws-url> <token>");
+          if (!rawUrl || !tkn) {
+            addLog("error", "Usage: /connect <base-url> <token>");
+            addLog("info", "  Example: /connect https://flow.liteyuki.org lys_xxxx");
             return;
           }
-          const host = getHostname();
-          setConnection(url, tkn, host);
-          addLog("info", `Connecting as "${host}" to ${url}...`);
-          connect(url, tkn);
+          doConnect(normalizeUrl(rawUrl), tkn);
           break;
         }
 
@@ -174,10 +182,12 @@ export function App() {
 
         case "/status": {
           const cfg = getConfig();
-          addLog("info", `Status: ${status}`);
-          addLog("info", `Server: ${cfg.serverUrl || "(not set)"}`);
-          addLog("info", `Token: ${cfg.token ? cfg.token.slice(0, 8) + "..." : "(not set)"}`);
-          addLog("info", `Config: ${getConfigPath()}`);
+          addLog("info", `Status:     ${status}`);
+          addLog("info", `Server:     ${cfg.baseUrl || "(not set)"}`);
+          addLog("info", `Device:     ${getDeviceName()}`);
+          addLog("info", `Device ID:  ${cfg.deviceId.slice(0, 8)}...`);
+          addLog("info", `Token:      ${cfg.token ? cfg.token.slice(0, 8) + "..." : "(not set)"}`);
+          addLog("info", `Config:     ${getConfigPath()}`);
           break;
         }
 
@@ -200,11 +210,11 @@ export function App() {
 
         case "/help":
           addLog("info", "Commands:");
-          addLog("info", "  /login [url]            Login via browser (fast, default)");
+          addLog("info", "  /login [url]            Login via browser (default: flow.liteyuki.org)");
           addLog("info", "  /login [url] --device   Login via device code (no browser)");
-          addLog("info", "  /connect <url> <token>  Connect with token directly");
+          addLog("info", "  /connect <url> <token>  Connect with base URL + token");
           addLog("info", "  /disconnect             Disconnect from server");
-          addLog("info", "  /status                 Show connection status & hostname");
+          addLog("info", "  /status                 Show connection info");
           addLog("info", "  /logout                 Clear saved credentials");
           addLog("info", "  /clear                  Clear log output");
           addLog("info", "  /quit                   Exit");
@@ -214,7 +224,7 @@ export function App() {
           addLog("error", `Unknown command: ${cmd}. Type /help`);
       }
     } else {
-      addLog("info", `Unknown input. Type /help for commands.`);
+      addLog("info", "Unknown input. Type /help for commands.");
     }
   }
 
@@ -227,10 +237,10 @@ export function App() {
 
   const statusIcon =
     status === "connected"
-      ? "●"
+      ? "\u25cf"
       : status === "connecting"
-        ? "◌"
-        : "○";
+        ? "\u25cc"
+        : "\u25cb";
 
   return (
     <Box flexDirection="column" height={process.stdout.rows || 24}>
@@ -246,7 +256,7 @@ export function App() {
         {isLoggingIn && (
           <>
             <Text> </Text>
-            <Text color="yellow">⏳ Waiting for browser auth...</Text>
+            <Text color="yellow">{"\u23f3"} Waiting for browser auth...</Text>
           </>
         )}
       </Box>
@@ -282,7 +292,7 @@ export function App() {
       {pendingConfirm && (
         <Box borderStyle="round" borderColor="yellow" paddingX={1}>
           <Text color="yellow" bold>
-            ⚠ Confirm dangerous operation? (y/n):{" "}
+            {"\u26a0"} Confirm dangerous operation? (y/n):{" "}
           </Text>
           <Text>{(pendingConfirm.request.args.command as string).slice(0, 60)}</Text>
         </Box>
@@ -291,7 +301,7 @@ export function App() {
       {/* Input */}
       <Box borderStyle="round" borderColor="gray" paddingX={1}>
         <Text color="green" bold>
-          {"❯ "}
+          {"\u276f "}
         </Text>
         <TextInput
           value={input}

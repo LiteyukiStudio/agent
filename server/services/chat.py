@@ -360,6 +360,7 @@ async def stream_response(
                 is_partial = bool(event.partial)
 
                 for part in event.content.parts:
+                    # --- 文本处理（去重逻辑只影响文本） ---
                     if part.text:
                         text = part.text
 
@@ -374,23 +375,36 @@ async def stream_response(
                                 author,
                                 len(text),
                             )
-                            continue
+                            # 注意：只跳过文本，不能 continue —— 同一个 part 可能还有其他内容
+                        else:
+                            # 非流式场景（没有 partial 事件），正常输出文本
+                            is_thinking = bool(part.thought)
+                            if not is_thinking:
+                                assistant_text += text
+                            sse_data = json.dumps(
+                                {
+                                    "event": "thinking" if is_thinking else "text",
+                                    "author": author,
+                                    "content": text,
+                                }
+                            )
+                            yield f"data: {sse_data}\n\n"
 
-                        # 区分思考过程和正式回复
-                        is_thinking = bool(part.thought)
-                        if not is_thinking:
-                            assistant_text += text
+                        # 流式场景下正常输出 partial 文本
+                        if is_partial:
+                            is_thinking = bool(part.thought)
+                            if not is_thinking:
+                                assistant_text += text
+                            sse_data = json.dumps(
+                                {
+                                    "event": "thinking" if is_thinking else "text",
+                                    "author": author,
+                                    "content": text,
+                                }
+                            )
+                            yield f"data: {sse_data}\n\n"
 
-                        sse_data = json.dumps(
-                            {
-                                "event": "thinking" if is_thinking else "text",
-                                "author": author,
-                                "content": text,
-                            }
-                        )
-                        yield f"data: {sse_data}\n\n"
-
-                    # 函数调用
+                    # --- 函数调用（不受去重影响） ---
                     if part.function_call:
                         tc_data = {
                             "name": part.function_call.name,

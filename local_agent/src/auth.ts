@@ -7,7 +7,7 @@
  * Device Code：CLI 获取验证码 → 用户手动打开 URL 输入验证码 → CLI 轮询
  */
 import { createServer } from "node:http";
-import { exec } from "node:child_process";
+import { exec, execSync } from "node:child_process";
 import { hostname as osHostname } from "node:os";
 import { platform } from "node:os";
 import { URL } from "node:url";
@@ -16,7 +16,44 @@ const DEFAULT_SERVER = "https://flow.liteyuki.org";
 const POLL_INTERVAL = 2000;
 const MAX_POLL_TIME = 600000;
 
-export function getHostname(): string {
+/** 规范化 base URL：去掉尾部斜杠 */
+export function normalizeUrl(url: string): string {
+  return url.replace(/\/+$/, "");
+}
+
+/** 从 base URL 构造 API URL */
+export function apiUrl(baseUrl: string, path: string): string {
+  return `${normalizeUrl(baseUrl)}${path}`;
+}
+
+/** 从 base URL 构造 WebSocket URL，附带 query 参数 */
+export function wsUrl(baseUrl: string, path: string): string {
+  const base = normalizeUrl(baseUrl);
+  return base.replace(/^http/, "ws") + path;
+}
+
+/** 获取友好的设备名称（macOS ComputerName / Linux hostname） */
+export function getDeviceName(): string {
+  // macOS: 优先用 ComputerName（用户友好名称，如"远野千束的MacBook Pro"）
+  if (platform() === "darwin") {
+    try {
+      const name = execSync("scutil --get ComputerName", { encoding: "utf-8" }).trim();
+      if (name) return name;
+    } catch {
+      // fallback
+    }
+  }
+
+  // Linux: 优先用 /etc/hostname 或 hostnamectl 的 pretty hostname
+  if (platform() === "linux") {
+    try {
+      const pretty = execSync("hostnamectl --static 2>/dev/null || hostname", { encoding: "utf-8" }).trim();
+      if (pretty) return pretty;
+    } catch {
+      // fallback
+    }
+  }
+
   return osHostname().replace(/\.local$/, "");
 }
 
@@ -32,24 +69,21 @@ function openBrowser(url: string): void {
 
 export interface LoginResult {
   token: string;
-  serverUrl: string;
+  baseUrl: string;
 }
 
 // ---------------------------------------------------------------------------
 // 快速浏览器认证（默认）
 // ---------------------------------------------------------------------------
 
-/**
- * 启动临时 HTTP server，打开浏览器到云端认证页，接收回调传回的 token。
- */
 export async function browserLogin(
-  serverUrl: string = DEFAULT_SERVER,
+  baseUrl: string = DEFAULT_SERVER,
   onStatus: (msg: string) => void,
 ): Promise<LoginResult | null> {
-  const host = getHostname();
+  const base = normalizeUrl(baseUrl);
+  const name = getDeviceName();
 
   return new Promise((resolve) => {
-    // 启动临时 HTTP server 监听回调
     const server = createServer((req, res) => {
       if (!req.url) {
         res.writeHead(400);
@@ -57,31 +91,30 @@ export async function browserLogin(
         return;
       }
 
-      const url = new URL(req.url, `http://localhost`);
+      const url = new URL(req.url, "http://localhost");
 
       if (url.pathname === "/callback") {
         const token = url.searchParams.get("token");
         const error = url.searchParams.get("error");
 
         if (token) {
-          // 返回成功页面
           res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
           res.end(`
             <html><body style="font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0">
               <div style="text-align:center">
-                <h1 style="color:#22c55e">✓ 授权成功</h1>
+                <h1 style="color:#22c55e">\u2713 授权成功</h1>
                 <p>你可以关闭此页面，回到终端继续操作。</p>
               </div>
             </body></html>
           `);
           server.close();
-          resolve({ token, serverUrl });
+          resolve({ token, baseUrl: base });
         } else {
           res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
           res.end(`
             <html><body style="font-family:system-ui;display:flex;justify-content:center;align-items:center;height:100vh;margin:0">
               <div style="text-align:center">
-                <h1 style="color:#ef4444">✗ 授权失败</h1>
+                <h1 style="color:#ef4444">\u2717 授权失败</h1>
                 <p>${error || "Unknown error"}</p>
               </div>
             </body></html>
@@ -92,7 +125,6 @@ export async function browserLogin(
       }
     });
 
-    // 监听随机端口
     server.listen(0, "127.0.0.1", () => {
       const addr = server.address();
       if (!addr || typeof addr === "string") {
@@ -101,14 +133,13 @@ export async function browserLogin(
       }
       const port = addr.port;
       const callbackUrl = `http://127.0.0.1:${port}/callback`;
-      const authUrl = `${serverUrl}/auth/cli?callback=${encodeURIComponent(callbackUrl)}&hostname=${encodeURIComponent(host)}`;
+      const authUrl = `${base}/auth/cli?callback=${encodeURIComponent(callbackUrl)}&hostname=${encodeURIComponent(name)}`;
 
-      onStatus(`Opening browser: ${authUrl}`);
+      onStatus(`Opening browser...`);
       openBrowser(authUrl);
-      onStatus(`Waiting for browser authorization... (localhost:${port})`);
+      onStatus(`Waiting for authorization... (localhost:${port})`);
     });
 
-    // 超时 5 分钟
     setTimeout(() => {
       server.close();
       resolve(null);
@@ -134,16 +165,16 @@ interface DeviceTokenResponse {
 }
 
 export async function deviceLogin(
-  serverUrl: string = DEFAULT_SERVER,
+  baseUrl: string = DEFAULT_SERVER,
   onStatus: (msg: string) => void,
 ): Promise<LoginResult | null> {
-  const apiBase = serverUrl.replace(/\/+$/, "");
+  const base = normalizeUrl(baseUrl);
 
   onStatus("Requesting device code...");
-  const codeRes = await fetch(`${apiBase}/api/v1/auth/device/code`, {
+  const codeRes = await fetch(apiUrl(base, "/api/v1/auth/device/code"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ server_url: serverUrl }),
+    body: JSON.stringify({ server_url: base }),
   });
 
   if (!codeRes.ok) {
@@ -160,7 +191,7 @@ export async function deviceLogin(
   while (Date.now() - startTime < MAX_POLL_TIME) {
     await new Promise((r) => setTimeout(r, POLL_INTERVAL));
     try {
-      const tokenRes = await fetch(`${apiBase}/api/v1/auth/device/token`, {
+      const tokenRes = await fetch(apiUrl(base, "/api/v1/auth/device/token"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ device_code: codeData.device_code }),
@@ -168,7 +199,7 @@ export async function deviceLogin(
       if (!tokenRes.ok) continue;
       const tokenData = (await tokenRes.json()) as DeviceTokenResponse;
       if (tokenData.status === "approved" && tokenData.token) {
-        return { token: tokenData.token, serverUrl };
+        return { token: tokenData.token, baseUrl: base };
       }
       if (tokenData.status === "expired") {
         onStatus("Authorization expired.");

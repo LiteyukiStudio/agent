@@ -212,7 +212,12 @@ async def revoke_token(
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> None:
-    """吊销（删除）一个 API 令牌。"""
+    """吊销（删除）一个 API 令牌，同时踢掉使用该令牌连接的 Local Agent。"""
     deleted = await delete_api_token(db, user.id, token_id)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Token not found")
+
+    # 踢掉使用该 token 连接的设备
+    from server.routers.local_agent import disconnect_by_token
+
+    await disconnect_by_token(user.id, token_id)

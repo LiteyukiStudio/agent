@@ -1,0 +1,200 @@
+name: Build Local Agent
+
+on:
+  push:
+    tags:
+      - "l*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: local-agent-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  BIN_NAME: liteyuki-agent
+  PACKAGE_DIR: local_agent
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            bun_target: bun-linux-x64
+          - os: ubuntu-latest
+            target: linux-arm64
+            bun_target: bun-linux-arm64
+          - os: macos-latest
+            target: darwin-x64
+            bun_target: bun-darwin-x64
+          - os: macos-latest
+            target: darwin-arm64
+            bun_target: bun-darwin-arm64
+          - os: windows-latest
+            target: win-x64
+            bun_target: bun-windows-x64
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: bun install
+
+      - name: Build binary
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: |
+          bun build src/cli.tsx --compile --target=${{ matrix.bun_target }} --outfile=../build/${{ env.BIN_NAME }}-${{ matrix.target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.BIN_NAME }}-${{ matrix.target }}
+          path: build/${{ env.BIN_NAME }}-${{ matrix.target }}*
+          retention-days: 30
+
+  publish-npm:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install & Build (npm package)
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: |
+          bun install
+          bun run build
+
+      - name: Set version from tag
+        working-directory: ${{ env.PACKAGE_DIR }}
+        run: |
+          VERSION="${GITHUB_REF#refs/tags/l}"
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          # Update package.json version
+          bun -e "
+            const pkg = JSON.parse(require('fs').readFileSync('package.json', 'utf-8'));
+            pkg.version = '$VERSION';
+            require('fs').writeFileSync('package.json', JSON.stringify(pkg, null, 2));
+          "
+
+      - name: Publish to npm
+        working-directory: ${{ env.PACKAGE_DIR }}
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${NPM_TOKEN}" > ~/.npmrc
+          npm publish --access public
+
+  release:
+    runs-on: ubuntu-latest
+    needs: build
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/l* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/l}"
+            TAG="${GITHUB_REF#refs/tags/}"
+            NIGHTLY="false"
+          else
+            VERSION="nightly-${GITHUB_SHA::8}"
+            TAG="nightly"
+            NIGHTLY="true"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "nightly=$NIGHTLY" >> $GITHUB_OUTPUT
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p release
+          cd artifacts
+          for f in *; do
+            if [[ -f "$f" ]]; then
+              # Add version to filename and compress
+              if [[ "$f" == *"win"* ]]; then
+                cp "$f" "../release/${f}.exe"
+              else
+                chmod +x "$f"
+                cp "$f" "../release/$f"
+              fi
+            fi
+          done
+          ls -la ../release/
+
+      - name: Generate changelog
+        id: changelog
+        if: steps.version.outputs.nightly == 'false'
+        run: |
+          # Get commits since last tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -n "$PREV_TAG" ]; then
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" "$PREV_TAG"..HEAD -- local_agent/)
+          else
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" --max-count=20 -- local_agent/)
+          fi
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1
+        with:
+          tag: ${{ steps.version.outputs.tag }}
+          name: "Local Agent ${{ steps.version.outputs.version }}"
+          body: |
+            ## Liteyuki Local Agent ${{ steps.version.outputs.version }}
+
+            ### 安装
+
+            **二进制（推荐）：** 下载对应平台的二进制文件，无需安装运行时。
+
+            | 平台 | 文件 |
+            |------|------|
+            | macOS (Apple Silicon) | `liteyuki-agent-darwin-arm64` |
+            | macOS (Intel) | `liteyuki-agent-darwin-x64` |
+            | Linux (x64) | `liteyuki-agent-linux-x64` |
+            | Linux (ARM64) | `liteyuki-agent-linux-arm64` |
+            | Windows (x64) | `liteyuki-agent-win-x64.exe` |
+
+            **npm：**
+            ```bash
+            npm install -g liteyuki-local-agent
+            liteyuki-agent
+            ```
+
+            ### 更新日志
+
+            ${{ steps.changelog.outputs.changelog || '首次发布' }}
+          artifacts: release/*
+          allowUpdates: true
+          token: ${{ secrets.GITHUB_TOKEN }}
+          prerelease: ${{ steps.version.outputs.nightly == 'true' }}

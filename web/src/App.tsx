@@ -3,6 +3,8 @@ import { Toaster } from 'sonner'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { LoginPage } from '@/pages/LoginPage'
 import { ChatPage } from '@/pages/ChatPage'
+import { CliAuthPage } from '@/pages/CliAuthPage'
+import { DeviceAuthPage } from '@/pages/DeviceAuthPage'
 import { PublicSessionPage } from '@/pages/PublicSessionPage'
 import { SettingsPage } from '@/pages/SettingsPage'
 import { AdminLayout } from '@/pages/admin/AdminLayout'
@@ -16,6 +18,10 @@ export default function App() {
       <Toaster position="top-center" richColors closeButton />
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+
+        {/* CLI / Device 授权页面 */}
+        <Route path="/auth/cli" element={<CliAuthPage />} />
+        <Route path="/device" element={<DeviceAuthPage />} />
 
         {/* Public session view (no auth required) */}
         <Route path="/session/:sessionId/public" element={<PublicSessionPage />} />

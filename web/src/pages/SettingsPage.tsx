@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy, Key, Plus, Trash2 } from 'lucide-react'
+import { Copy, Key, Monitor, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -25,6 +25,11 @@ interface UsageStats {
   monthly: { used: number, limit: number | null, remaining: number | null }
 }
 
+interface DevicesResponse {
+  devices: { id: string, device_id: string, device_name: string, online: boolean, last_seen_at: string | null }[]
+  count: number
+}
+
 function formatTokens(n: number): string {
   if (n >= 1_000_000)
     return `${(n / 1_000_000).toFixed(1)}M`
@@ -43,6 +48,7 @@ export function SettingsPage() {
   const [createdToken, setCreatedToken] = useState<string | null>(null)
   const [creating, setCreating] = useState(false)
   const [deleteTokenId, setDeleteTokenId] = useState<string | null>(null)
+  const [devices, setDevices] = useState<DevicesResponse | null>(null)
 
   const loadTokens = useCallback(() => {
     apiGet<ApiToken[]>('/api/v1/auth/tokens').then(setTokens).catch(() => {})
@@ -52,10 +58,18 @@ export function SettingsPage() {
     apiGet<UsageStats>('/api/v1/usage/me').then(setUsage).catch(() => {})
   }, [])
 
+  const loadDevices = useCallback(() => {
+    apiGet<DevicesResponse>('/api/v1/local-agent/devices').then(setDevices).catch(() => {})
+  }, [])
+
   useEffect(() => {
     loadTokens()
     loadUsage()
-  }, [loadTokens, loadUsage])
+    loadDevices()
+    // 设备列表 5s 自动刷新
+    const interval = setInterval(loadDevices, 5000)
+    return () => clearInterval(interval)
+  }, [loadTokens, loadUsage, loadDevices])
 
   async function handleCreate() {
     if (!newTokenName.trim())
@@ -127,6 +141,84 @@ export function SettingsPage() {
         </Card>
       )}
 
+      {/* Online Devices */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between text-base">
+            <span className="flex items-center gap-2">
+              <Monitor className="size-4" />
+              Local Agent 设备
+            </span>
+            <Button variant="ghost" size="icon" className="size-8" onClick={loadDevices}>
+              <RefreshCw className="size-3.5" />
+            </Button>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {devices && devices.count > 0
+            ? (
+                <div className="space-y-2">
+                  {devices.devices.map(d => (
+                    <div key={d.device_id} className="flex items-center justify-between rounded-lg border p-3">
+                      <div className="flex items-center gap-3">
+                        <div className={`flex size-8 items-center justify-center rounded-lg ${d.online ? 'bg-emerald-100 dark:bg-emerald-900' : 'bg-muted'}`}>
+                          <Monitor className={`size-4 ${d.online ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}`} />
+                        </div>
+                        <div>
+                          <p className={`text-sm font-medium ${!d.online ? 'text-muted-foreground' : ''}`}>{d.device_name}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {d.device_id.slice(0, 8)}
+                            {!d.online && d.last_seen_at && ` · 最后在线 ${new Date(d.last_seen_at).toLocaleString()}`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={d.online ? 'default' : 'secondary'} className={d.online ? 'bg-emerald-500 hover:bg-emerald-500' : ''}>
+                          {d.online ? '在线' : '离线'}
+                        </Badge>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-7 text-destructive hover:text-destructive"
+                          onClick={async () => {
+                            try {
+                              await apiDelete(`/api/v1/local-agent/devices/${d.device_id}`)
+                              loadDevices()
+                              loadTokens()
+                              toast.success('设备已移除')
+                            }
+                            catch (err) {
+                              toast.error(err instanceof Error ? err.message : 'Failed')
+                            }
+                          }}
+                        >
+                          <Trash2 className="size-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            : (
+                <div className="text-center py-6 text-sm text-muted-foreground">
+                  <Monitor className="mx-auto mb-2 size-8 text-muted-foreground/40" />
+                  <p>暂无设备</p>
+                  <p className="mt-1 text-xs">
+                    安装
+                    {' '}
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs">liteyuki-local-agent</code>
+                    {' '}
+                    并运行
+                    {' '}
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs">liteyuki-agent</code>
+                    {' '}
+                    连接
+                  </p>
+                </div>
+              )}
+        </CardContent>
+      </Card>
+
       {/* Created token alert */}
       {createdToken && (
         <Card className="border-emerald-500 bg-emerald-50 dark:bg-emerald-950">
@@ -173,14 +265,19 @@ export function SettingsPage() {
 
           {tokens.map(tok => (
             <div key={tok.id} className="flex items-center justify-between rounded-lg border p-3">
-              <div>
-                <p className="text-sm font-medium">{tok.name}</p>
+              <div className="flex items-center gap-2">
+                {tok.scopes === 'local-agent' && (
+                  <Monitor className="size-4 text-muted-foreground" />
+                )}
+                <div>
+                  <p className="text-sm font-medium">{tok.name}</p>
                 <p className="text-xs text-muted-foreground">
                   {`lys_...${tok.token_last_eight}`}
                   {' '}
                   ·
                   {new Date(tok.created_at).toLocaleDateString()}
                 </p>
+                </div>
               </div>
               <Button
                 variant="ghost"

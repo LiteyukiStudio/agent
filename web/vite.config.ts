@@ -26,6 +26,11 @@ export default defineConfig({
           })
         },
       },
+      '/ws': {
+        target: process.env.VITE_API_URL || 'http://localhost:8000',
+        changeOrigin: true,
+        ws: true,
+      },
     },
   },
 })
