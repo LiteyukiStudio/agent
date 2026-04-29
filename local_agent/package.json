@@ -1,0 +1,37 @@
+{
+  "name": "liteyuki-local-agent",
+  "version": "0.1.0",
+  "description": "Liteyuki Flow 本地代理 - 连接云端 Agent 执行本地操作",
+  "type": "module",
+  "bin": {
+    "liteyuki-agent": "./dist/cli.js"
+  },
+  "scripts": {
+    "dev": "tsx src/cli.tsx",
+    "build": "tsup src/cli.tsx --format esm --dts",
+    "lint": "tsc --noEmit"
+  },
+  "keywords": [
+    "liteyuki",
+    "agent",
+    "local",
+    "cli"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "chalk": "^5.4.0",
+    "conf": "^13.0.0",
+    "ink": "^5.2.0",
+    "ink-text-input": "^6.0.0",
+    "react": "^18.3.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.0",
+    "@types/ws": "^8.5.0",
+    "tsup": "^8.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.7.0"
+  }
+}

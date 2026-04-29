@@ -99,7 +99,7 @@ export function ChatArea({ session, isLoading, onSend, onStop, onTogglePublic }:
             </div>
           )}
           {session.messages.map(msg => (
-            <MessageBubble key={msg.id} message={msg} />
+            <MessageBubble key={msg.id} message={msg} onSend={onSend} onResend={onSend} />
           ))}
           {isLoading && (
             <div className="flex gap-3">

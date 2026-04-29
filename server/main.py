@@ -14,7 +14,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import server.models  # noqa: F401 — 确保所有模型被注册
 from server.config import settings
 from server.database import async_session_factory
-from server.routers import admin, auth, chat, usage, user_config
+from server.routers import admin, auth, chat, device_auth, local_agent, usage, user_config
 from server.services.auth import init_superuser
 from server.services.usage import init_default_plan
 
@@ -92,6 +92,8 @@ app.include_router(chat.router)
 app.include_router(admin.router)
 app.include_router(usage.router)
 app.include_router(user_config.router)
+app.include_router(local_agent.router)
+app.include_router(device_auth.router)
 
 
 @app.get("/api/v1/health")

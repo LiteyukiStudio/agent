@@ -63,3 +63,38 @@ async def delete_config(
     deleted = await config_service.delete_config(db, user.id, namespace, key)
     if not deleted:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Config not found")
+
+
+# ---------------------------------------------------------------------------
+# 用户画像记忆（memory namespace 的便捷接口）
+# ---------------------------------------------------------------------------
+
+
+@router.get("/memories", response_model=list[UserConfigResponse])
+async def list_memories(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> list[dict]:
+    """列出 AI 记住的关于当前用户的所有信息。"""
+    return await config_service.get_configs(db, user.id, namespace="memory")
+
+
+@router.delete("/memories", status_code=status.HTTP_204_NO_CONTENT)
+async def clear_all_memories(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> None:
+    """清除 AI 记住的关于当前用户的所有信息。"""
+    from sqlalchemy import select
+
+    from server.models.user_config import UserConfig
+
+    result = await db.execute(
+        select(UserConfig).where(
+            UserConfig.user_id == user.id,
+            UserConfig.namespace == "memory",
+        ),
+    )
+    for config in result.scalars().all():
+        await db.delete(config)
+    await db.commit()
