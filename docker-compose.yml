@@ -23,7 +23,8 @@ services:
 
       # ---- 数据库 ----
       # SQLite（默认，数据持久化到 volume）
-      DATABASE_URL: ${DATABASE_URL:-sqlite+aiosqlite:///./data/data.db}
+      # 注意：容器内硬编码 /app/data/ 路径，不从宿主 .env 继承
+      DATABASE_URL: sqlite+aiosqlite:///./data/data.db
       # PostgreSQL（取消注释并注释掉上面的 SQLite）
       # DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-liteyuki}:${POSTGRES_PASSWORD:-liteyuki}@postgres:5432/${POSTGRES_DB:-liteyuki_sre}
 

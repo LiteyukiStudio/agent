@@ -174,6 +174,8 @@ export function useChat() {
     if (!activeSessionId || !content.trim() || isLoading)
       return
 
+    const sid = activeSessionId
+
     const userMsg: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -182,8 +184,8 @@ export function useChat() {
     }
 
     setMessagesBySession((prev) => {
-      const msgs = prev[activeSessionId] || []
-      return { ...prev, [activeSessionId]: [...msgs, userMsg] }
+      const msgs = prev[sid] || []
+      return { ...prev, [sid]: [...msgs, userMsg] }
     })
 
     setIsLoading(true)
@@ -208,16 +210,16 @@ export function useChat() {
 
     function updateAssistantMsg(contentOverride?: string) {
       setMessagesBySession((prev) => {
-        const msgs = (prev[activeSessionId] || []).filter(m => m.id !== assistantMsgId)
+        const msgs = (prev[sid] || []).filter(m => m.id !== assistantMsgId)
         return {
           ...prev,
-          [activeSessionId]: [...msgs, buildAssistantMsg(contentOverride)],
+          [sid]: [...msgs, buildAssistantMsg(contentOverride)],
         }
       })
     }
 
     try {
-      for await (const event of streamSSE(`/api/v1/chat/sessions/${activeSessionId}/messages`, { content: content.trim() })) {
+      for await (const event of streamSSE(`/api/v1/chat/sessions/${sid}/messages`, { content: content.trim() })) {
         const eventType = event.event as string
 
         if (eventType === 'thinking') {
@@ -252,7 +254,7 @@ export function useChat() {
         else if (eventType === 'done' && event.title) {
           const newTitle = event.title as string
           setSessions(prev => prev.map(s =>
-            s.id === activeSessionId ? { ...s, title: newTitle } : s,
+            s.id === sid ? { ...s, title: newTitle } : s,
           ))
         }
       }
@@ -268,7 +270,7 @@ export function useChat() {
 
     // Update session last message
     setSessions(prev => prev.map((s) => {
-      if (s.id !== activeSessionId)
+      if (s.id !== sid)
         return s
       return { ...s, lastMessage: (assistantContent || content.trim()).slice(0, 50), updatedAt: new Date() }
     }))
