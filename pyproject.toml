@@ -10,6 +10,7 @@ dependencies = [
     "litellm>=1.50",
     "fastapi>=0.115",
     "uvicorn[standard]>=0.34",
+    "hypercorn>=0.17",
     "sqlalchemy>=2.0",
     "aiosqlite>=0.21",
     "asyncpg>=0.30",

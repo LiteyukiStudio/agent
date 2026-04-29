@@ -102,4 +102,5 @@ async def health() -> dict[str, str]:
 
 def cli() -> None:
     """`uv run server` 的 CLI 入口点。"""
+    # 开发环境仍用 uvicorn（支持 reload），生产用 hypercorn
     uvicorn.run("server.main:app", host="0.0.0.0", port=8000, reload=True)

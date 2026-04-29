@@ -50,7 +50,7 @@ export function ChatArea({ session, isLoading, onSend, onTogglePublic }: ChatAre
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex h-14 items-center justify-between border-b px-6">
+      <div className="flex h-14 items-center justify-between border-b px-6 pl-14 md:pl-6">
         <h2 className="text-sm font-medium truncate">{session.title}</h2>
         <DropdownMenu>
           <DropdownMenuTrigger

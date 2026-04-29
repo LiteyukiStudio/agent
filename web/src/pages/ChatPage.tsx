@@ -85,7 +85,7 @@ export function ChatPage() {
         >
           <Menu className="size-5" />
         </SheetTrigger>
-        <SheetContent side="left" className="w-[280px] p-0">
+        <SheetContent side="left" className="w-[280px] p-0 border-r-0" showCloseButton={false}>
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           {sidebarContent}
         </SheetContent>

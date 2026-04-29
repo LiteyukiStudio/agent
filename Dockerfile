@@ -23,5 +23,5 @@ RUN uv sync --frozen
 
 EXPOSE 8000
 
-# 启动后端
-CMD ["uv", "run", "uvicorn", "server.main:app", "--host", "0.0.0.0", "--port", "8000", "--log-level", "info"]
+# 启动后端（Hypercorn ASGI server）
+CMD ["uv", "run", "hypercorn", "server.main:app", "--bind", "0.0.0.0:8000", "--access-log", "-"]
