@@ -3,7 +3,7 @@
  */
 import { getConfig, getDeviceId } from "./config.js";
 import { connect, disconnect, setEvents } from "./connection.js";
-import { getDeviceName, wsUrl } from "./auth.js";
+import { getDeviceName, getOsType, wsUrl } from "./auth.js";
 
 function log(level: string, msg: string): void {
   const ts = new Date().toISOString();
@@ -45,9 +45,10 @@ export function runDaemon(): void {
     },
   });
 
+  const os = getOsType();
   const fullWsUrl = wsUrl(
     cfg.baseUrl,
-    `/ws/local-agent?token=${encodeURIComponent(cfg.token)}&device_id=${encodeURIComponent(deviceId)}&device_name=${encodeURIComponent(deviceName)}`,
+    `/ws/local-agent?token=${encodeURIComponent(cfg.token)}&device_id=${encodeURIComponent(deviceId)}&device_name=${encodeURIComponent(deviceName)}&os=${encodeURIComponent(os)}`,
   );
 
   log("INFO", "Connecting...");

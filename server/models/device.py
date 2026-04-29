@@ -20,6 +20,7 @@ class Device(Base):
     user_id: Mapped[str] = mapped_column(String(36), ForeignKey("users.id"), nullable=False)
     device_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True)  # 客户端生成的 UUID
     device_name: Mapped[str] = mapped_column(String(200), nullable=False, default="unknown")
+    os_type: Mapped[str] = mapped_column(String(32), nullable=False, default="unknown")
     token_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("api_tokens.id"), nullable=True)
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

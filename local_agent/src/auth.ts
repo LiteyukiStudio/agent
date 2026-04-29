@@ -8,9 +8,10 @@
  */
 import { createServer } from "node:http";
 import { exec, execSync } from "node:child_process";
-import { hostname as osHostname } from "node:os";
+import { hostname as osHostname, release } from "node:os";
 import { platform } from "node:os";
 import { URL } from "node:url";
+import { existsSync, readFileSync } from "node:fs";
 
 const DEFAULT_SERVER = "https://flow.liteyuki.org";
 const POLL_INTERVAL = 2000;
@@ -55,6 +56,38 @@ export function getDeviceName(): string {
   }
 
   return osHostname().replace(/\.local$/, "");
+}
+
+/**
+ * 获取操作系统标识，用于前端显示对应图标。
+ * 返回值：macos, windows, ubuntu, debian, fedora, arch, centos, linux, unknown
+ */
+export function getOsType(): string {
+  const p = platform();
+  if (p === "darwin") return "macos";
+  if (p === "win32") return "windows";
+  if (p === "linux") {
+    // 尝试读取 /etc/os-release 判断发行版
+    try {
+      if (existsSync("/etc/os-release")) {
+        const content = readFileSync("/etc/os-release", "utf-8").toLowerCase();
+        if (content.includes("ubuntu")) return "ubuntu";
+        if (content.includes("debian")) return "debian";
+        if (content.includes("fedora")) return "fedora";
+        if (content.includes("arch")) return "arch";
+        if (content.includes("centos")) return "centos";
+        if (content.includes("alpine")) return "alpine";
+        if (content.includes("opensuse") || content.includes("suse")) return "suse";
+        if (content.includes("manjaro")) return "manjaro";
+        if (content.includes("mint")) return "mint";
+        if (content.includes("redhat") || content.includes("rhel")) return "redhat";
+      }
+    } catch {
+      // fallback
+    }
+    return "linux";
+  }
+  return "unknown";
 }
 
 function openBrowser(url: string): void {

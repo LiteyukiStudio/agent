@@ -54,9 +54,11 @@ export function useChat() {
   const { user } = useAuth()
   const [sessions, setSessions] = useState<Session[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [loadingSessionIds, setLoadingSessionIds] = useState<Set<string>>(new Set())
   const [messagesBySession, setMessagesBySession] = useState<Record<string, Message[]>>({})
-  const abortRef = useRef<AbortController | null>(null)
+  const abortRef = useRef<Record<string, AbortController>>({})
+
+  const isLoading = activeSessionId ? loadingSessionIds.has(activeSessionId) : false
 
   // 在用户认证完成后才加载 sessions
   useEffect(() => {
@@ -174,7 +176,7 @@ export function useChat() {
   }, [])
 
   const sendMessage = useCallback(async (content: string) => {
-    if (!activeSessionId || !content.trim() || isLoading)
+    if (!activeSessionId || !content.trim() || loadingSessionIds.has(activeSessionId))
       return
 
     const sid = activeSessionId
@@ -191,9 +193,9 @@ export function useChat() {
       return { ...prev, [sid]: [...msgs, userMsg] }
     })
 
-    setIsLoading(true)
+    setLoadingSessionIds(prev => new Set(prev).add(sid))
     const abortController = new AbortController()
-    abortRef.current = abortController
+    abortRef.current[sid] = abortController
 
     const assistantMsgId = `assistant-${Date.now()}`
     let assistantContent = ''
@@ -286,16 +288,20 @@ export function useChat() {
       return { ...s, lastMessage: (assistantContent || content.trim()).slice(0, 50), updatedAt: new Date() }
     }))
 
-    setIsLoading(false)
-    abortRef.current = null
-  }, [activeSessionId, isLoading])
+    setLoadingSessionIds((prev) => {
+      const next = new Set(prev)
+      next.delete(sid)
+      return next
+    })
+    delete abortRef.current[sid]
+  }, [activeSessionId, loadingSessionIds])
 
   const stopGeneration = useCallback(() => {
-    if (abortRef.current) {
-      abortRef.current.abort()
-      abortRef.current = null
+    if (activeSessionId && abortRef.current[activeSessionId]) {
+      abortRef.current[activeSessionId].abort()
+      delete abortRef.current[activeSessionId]
     }
-  }, [])
+  }, [activeSessionId])
 
   const togglePublic = useCallback(async (sessionId: string) => {
     const session = sessions.find(s => s.id === sessionId)

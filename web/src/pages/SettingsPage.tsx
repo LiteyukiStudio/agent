@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Copy, Key, Monitor, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { FaApple, FaWindows, FaLinux, FaUbuntu, FaFedora, FaSuse, FaCentos, FaRedhat } from 'react-icons/fa6'
+import { SiDebian, SiArchlinux, SiAlpinelinux, SiLinuxmint, SiManjaro } from 'react-icons/si'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -26,8 +28,28 @@ interface UsageStats {
 }
 
 interface DevicesResponse {
-  devices: { id: string, device_id: string, device_name: string, online: boolean, last_seen_at: string | null }[]
+  devices: { id: string, device_id: string, device_name: string, os_type: string, online: boolean, last_seen_at: string | null }[]
   count: number
+}
+
+function OsIcon({ os, className }: { os: string, className?: string }) {
+  const cls = className || 'size-4'
+  switch (os) {
+    case 'macos': return <FaApple className={cls} />
+    case 'windows': return <FaWindows className={cls} />
+    case 'ubuntu': return <FaUbuntu className={cls} />
+    case 'debian': return <SiDebian className={cls} />
+    case 'fedora': return <FaFedora className={cls} />
+    case 'arch': return <SiArchlinux className={cls} />
+    case 'centos': return <FaCentos className={cls} />
+    case 'alpine': return <SiAlpinelinux className={cls} />
+    case 'suse': return <FaSuse className={cls} />
+    case 'manjaro': return <SiManjaro className={cls} />
+    case 'mint': return <SiLinuxmint className={cls} />
+    case 'redhat': return <FaRedhat className={cls} />
+    case 'linux': return <FaLinux className={cls} />
+    default: return <Monitor className={cls} />
+  }
 }
 
 function formatTokens(n: number): string {
@@ -162,7 +184,7 @@ export function SettingsPage() {
                     <div key={d.device_id} className="flex items-center justify-between rounded-lg border p-3">
                       <div className="flex items-center gap-3">
                         <div className={`flex size-8 items-center justify-center rounded-lg ${d.online ? 'bg-emerald-100 dark:bg-emerald-900' : 'bg-muted'}`}>
-                          <Monitor className={`size-4 ${d.online ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}`} />
+                          <OsIcon os={d.os_type} className={`size-4 ${d.online ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}`} />
                         </div>
                         <div>
                           <p className={`text-sm font-medium ${!d.online ? 'text-muted-foreground' : ''}`}>{d.device_name}</p>

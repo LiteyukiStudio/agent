@@ -15,6 +15,7 @@ import {
   browserLogin,
   deviceLogin,
   getDeviceName,
+  getOsType,
   normalizeUrl,
   wsUrl,
   type LoginResult,
@@ -40,11 +41,12 @@ function timestamp(): string {
   return new Date().toLocaleTimeString("zh-CN", { hour12: false });
 }
 
-/** 从 base URL + token + deviceId + deviceName 构建完整 WS 连接地址 */
+/** 从 base URL + token + deviceId + deviceName + os 构建完整 WS 连接地址 */
 function buildWsUrl(baseUrl: string, token: string): string {
   const deviceId = getDeviceId();
   const deviceName = getDeviceName();
-  return wsUrl(baseUrl, `/ws/local-agent?token=${encodeURIComponent(token)}&device_id=${encodeURIComponent(deviceId)}&device_name=${encodeURIComponent(deviceName)}`);
+  const os = getOsType();
+  return wsUrl(baseUrl, `/ws/local-agent?token=${encodeURIComponent(token)}&device_id=${encodeURIComponent(deviceId)}&device_name=${encodeURIComponent(deviceName)}&os=${encodeURIComponent(os)}`);
 }
 
 export function App() {

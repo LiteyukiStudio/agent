@@ -27,6 +27,7 @@ def upgrade() -> None:
         sa.Column("user_id", sa.String(length=36), nullable=False),
         sa.Column("device_id", sa.String(length=64), nullable=False),
         sa.Column("device_name", sa.String(length=200), nullable=False),
+        sa.Column("os_type", sa.String(length=32), nullable=False, server_default="unknown"),
         sa.Column("token_id", sa.String(length=36), nullable=True),
         sa.Column("last_seen_at", sa.DateTime(), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),
         sa.Column("created_at", sa.DateTime(), server_default=sa.text("(CURRENT_TIMESTAMP)"), nullable=False),

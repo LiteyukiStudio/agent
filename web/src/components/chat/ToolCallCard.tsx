@@ -1,7 +1,51 @@
 import { useState } from 'react'
-import { ChevronDown, ChevronRight, Wrench } from 'lucide-react'
+import { ChevronDown, ChevronRight, Monitor, Wrench } from 'lucide-react'
+import { FaApple, FaWindows, FaLinux, FaUbuntu, FaFedora, FaSuse, FaCentos, FaRedhat } from 'react-icons/fa6'
+import { SiDebian, SiArchlinux, SiAlpinelinux, SiLinuxmint, SiManjaro } from 'react-icons/si'
 import { Badge } from '@/components/ui/badge'
 import type { ToolCall } from '@/types/chat'
+
+interface DeviceMeta {
+  device_name: string
+  os_type: string
+}
+
+function OsIcon({ os, className }: { os: string, className?: string }) {
+  const cls = className || 'size-3'
+  switch (os) {
+    case 'macos': return <FaApple className={cls} />
+    case 'windows': return <FaWindows className={cls} />
+    case 'ubuntu': return <FaUbuntu className={cls} />
+    case 'debian': return <SiDebian className={cls} />
+    case 'fedora': return <FaFedora className={cls} />
+    case 'arch': return <SiArchlinux className={cls} />
+    case 'centos': return <FaCentos className={cls} />
+    case 'alpine': return <SiAlpinelinux className={cls} />
+    case 'suse': return <FaSuse className={cls} />
+    case 'manjaro': return <SiManjaro className={cls} />
+    case 'mint': return <SiLinuxmint className={cls} />
+    case 'redhat': return <FaRedhat className={cls} />
+    case 'linux': return <FaLinux className={cls} />
+    default: return <Monitor className={cls} />
+  }
+}
+
+/** 从工具结果中解析设备信息 */
+function parseDeviceInfo(result: string | undefined): { cleanResult: string, device: DeviceMeta | null } {
+  if (!result) return { cleanResult: '', device: null }
+  const match = result.match(/\n<!--device:(.+?)-->$/)
+  if (!match) return { cleanResult: result, device: null }
+  try {
+    const data = JSON.parse(match[1]) as { _device: DeviceMeta }
+    return { cleanResult: result.replace(match[0], ''), device: data._device }
+  }
+  catch {
+    return { cleanResult: result, device: null }
+  }
+}
+
+/** local_agent 相关工具名 */
+const LOCAL_TOOLS = new Set(['local_run_command', 'local_read_file', 'local_write_file', 'local_list_files', 'local_list_devices'])
 
 interface ToolCallCardProps {
   toolCall: ToolCall
@@ -17,6 +61,9 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
     error: 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300',
   }
 
+  const { cleanResult, device } = parseDeviceInfo(toolCall.result)
+  const isLocalTool = LOCAL_TOOLS.has(toolCall.name)
+
   return (
     <div className="my-1.5">
       <button
@@ -30,6 +77,13 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
         <Badge variant="secondary" className={`ml-1 text-[10px] px-1.5 py-0 ${statusColor[toolCall.status]}`}>
           {toolCall.status}
         </Badge>
+        {/* 设备标识 */}
+        {isLocalTool && device && (
+          <span className="ml-1.5 inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
+            <OsIcon os={device.os_type} className="size-2.5" />
+            {device.device_name}
+          </span>
+        )}
       </button>
 
       {expanded && (
@@ -42,11 +96,11 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
               </pre>
             </div>
           )}
-          {toolCall.result && (
+          {cleanResult && (
             <div>
               <p className="mb-1 font-medium text-muted-foreground">Result</p>
               <pre className="overflow-x-auto rounded bg-background p-2 text-[11px] leading-relaxed max-h-48">
-                {toolCall.result}
+                {cleanResult}
               </pre>
             </div>
           )}

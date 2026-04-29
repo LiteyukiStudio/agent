@@ -34,11 +34,19 @@ router = APIRouter(tags=["local-agent"])
 class DeviceInfo:
     """一个已连接的设备。"""
 
-    def __init__(self, device_id: str, device_name: str, ws: WebSocket, token_id: str = "") -> None:
+    def __init__(
+        self,
+        device_id: str,
+        device_name: str,
+        ws: WebSocket,
+        token_id: str = "",
+        os_type: str = "unknown",
+    ) -> None:
         self.device_id = device_id
         self.device_name = device_name
         self.ws = ws
-        self.token_id = token_id  # 关联的 API Token ID，用于联动删除
+        self.token_id = token_id
+        self.os_type = os_type
 
 
 # ---------------------------------------------------------------------------
@@ -80,7 +88,15 @@ async def _resolve_user_id(token: str) -> tuple[str | None, str]:
 def get_connected_devices(user_id: str) -> list[dict]:
     """获取用户所有已连接设备的信息。"""
     devices = _connections.get(user_id, {})
-    return [{"device_id": d.device_id, "device_name": d.device_name, "token_id": d.token_id} for d in devices.values()]
+    return [
+        {
+            "device_id": d.device_id,
+            "device_name": d.device_name,
+            "os_type": d.os_type,
+            "token_id": d.token_id,
+        }
+        for d in devices.values()
+    ]
 
 
 async def disconnect_by_token(user_id: str, token_id: str) -> int:
@@ -145,7 +161,14 @@ async def call_local_agent(
 
     try:
         await device.ws.send_json(request)
-        return await asyncio.wait_for(future, timeout=timeout)
+        result = await asyncio.wait_for(future, timeout=timeout)
+        # 附加设备信息到结果中
+        result["_device"] = {
+            "device_id": device.device_id,
+            "device_name": device.device_name,
+            "os_type": device.os_type,
+        }
+        return result
     except TimeoutError:
         return {"error": f"本地 Agent ({device.device_name}) 执行超时（{timeout}s）"}
     except Exception as e:
@@ -165,6 +188,7 @@ async def local_agent_websocket(
     token: str = Query(...),
     device_id: str = Query(default=""),
     device_name: str = Query(default="unknown"),
+    os: str = Query(default="unknown"),
 ) -> None:
     """本地 Agent 的 WebSocket 连接端点。
 
@@ -192,6 +216,7 @@ async def local_agent_websocket(
         dev = result.scalar_one_or_none()
         if dev:
             dev.device_name = device_name
+            dev.os_type = os
             dev.token_id = token_id or dev.token_id
             dev.last_seen_at = __import__("datetime").datetime.utcnow()
         else:
@@ -199,6 +224,7 @@ async def local_agent_websocket(
                 user_id=user_id,
                 device_id=device_id,
                 device_name=device_name,
+                os_type=os,
                 token_id=token_id or None,
             )
             db.add(dev)
@@ -213,7 +239,7 @@ async def local_agent_websocket(
         with contextlib.suppress(Exception):
             await old.ws.close(code=4002, reason="New connection from same device")
 
-    _connections[user_id][device_id] = DeviceInfo(device_id, device_name, ws, token_id)
+    _connections[user_id][device_id] = DeviceInfo(device_id, device_name, ws, token_id, os)
 
     try:
         while True:
@@ -277,6 +303,7 @@ async def list_devices(
             "id": d.id,
             "device_id": d.device_id,
             "device_name": d.device_name,
+            "os_type": d.os_type,
             "online": d.device_id in online_ids,
             "last_seen_at": d.last_seen_at.isoformat() if d.last_seen_at else None,
             "created_at": d.created_at.isoformat() if d.created_at else None,
