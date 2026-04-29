@@ -9,7 +9,7 @@ on:
 env:
   GITEA_URL: https://git.liteyuki.org
   GITEA_OWNER: liteyuki-docker
-  GITEA_REPO: adk-demo
+  GITEA_REPO: agent
 
 jobs:
   gitea-trigger:
