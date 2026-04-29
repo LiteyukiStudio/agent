@@ -59,6 +59,7 @@ export function ChatPage() {
     <Sidebar
       sessions={sessions}
       activeSessionId={activeSession?.id ?? null}
+      isLoading={isLoading}
       onSelectSession={handleSelectSession}
       onNewSession={handleNewSession}
       onDeleteSession={handleDeleteSession}

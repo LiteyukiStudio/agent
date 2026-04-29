@@ -5,6 +5,7 @@ import {
   ChevronUp,
   Ellipsis,
   Globe,
+  Loader2,
   LogOut,
   MessageSquarePlus,
   Moon,
@@ -38,6 +39,7 @@ import type { Session } from '@/types/chat'
 interface SidebarProps {
   sessions: Session[]
   activeSessionId: string | null
+  isLoading?: boolean
   onSelectSession: (id: string) => void
   onNewSession: () => void
   onDeleteSession?: (id: string) => void
@@ -65,7 +67,7 @@ const LANGUAGES = [
   { code: 'ja', label: 'languageJa' },
 ] as const
 
-export function Sidebar({ sessions, activeSessionId, onSelectSession, onNewSession, onDeleteSession, onRenameSession }: SidebarProps) {
+export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession, onNewSession, onDeleteSession, onRenameSession }: SidebarProps) {
   const { t } = useTranslation('chat')
   const { t: tc } = useTranslation('common')
   const { t: ts } = useTranslation('settings')
@@ -166,8 +168,11 @@ export function Sidebar({ sessions, activeSessionId, onSelectSession, onNewSessi
                     />
                   )
                 : (
-                    <span className="w-full truncate font-medium text-sidebar-foreground">
-                      {session.title}
+                    <span className="flex w-full items-center gap-1.5 font-medium text-sidebar-foreground">
+                      <span className="truncate">{session.title}</span>
+                      {isLoading && activeSessionId === session.id && (
+                        <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />
+                      )}
                     </span>
                   )}
               <span className="flex w-full items-center justify-between text-xs text-muted-foreground">
