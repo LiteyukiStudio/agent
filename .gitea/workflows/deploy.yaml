@@ -26,12 +26,12 @@ concurrency:
 env:
   REGISTRY: git.liteyuki.org
   REGISTRY_USER: snowykami
-  BACKEND_TAG: git.liteyuki.org/liteyuki-docker/liteyuki-sre-backend:latest
-  FRONTEND_TAG: git.liteyuki.org/liteyuki-docker/liteyuki-sre-frontend:latest
-  BACKEND_NAME: liteyuki-sre-backend
-  FRONTEND_NAME: liteyuki-sre-frontend
-  BACKEND_OPTIONS: --network liteyuki-network --restart=always -v /opt/dockers/liteyuki-sre/data:/app/data ${{ secrets.ADDITIONAL_BACKEND_OPTIONS }}
-  FRONTEND_OPTIONS: --network liteyuki-network --restart=always ${{ secrets.ADDITIONAL_FRONTEND_OPTIONS }}
+  BACKEND_TAG: git.liteyuki.org/liteyuki/liteyuki-agent-backend:latest
+  FRONTEND_TAG: git.liteyuki.org/liteyuki/liteyuki-agent-frontend:latest
+  BACKEND_NAME: liteyuki-agent-backend
+  FRONTEND_NAME: liteyuki-agent-frontend
+  BACKEND_OPTIONS: --network liteyuki-network --network liteyuki6-network --restart=always -v /opt/dockers/liteyuki-agent/data:/app/data ${{ secrets.ADDITIONAL_BACKEND_OPTIONS }}
+  FRONTEND_OPTIONS: --network liteyuki-network --network liteyuki6-network --restart=always ${{ secrets.ADDITIONAL_FRONTEND_OPTIONS }}
 
 jobs:
   build-and-deploy-backend:
