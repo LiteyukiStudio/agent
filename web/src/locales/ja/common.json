@@ -24,8 +24,10 @@
   "copy": "コピー",
   "disclaimer": "LiteYuki Flow Agent は間違えることがあります。重要な操作は確認してください。",
   "language": "言語",
-  "darkMode": "ダークモード",
-  "lightMode": "ライトモード",
+  "theme": "テーマ",
+  "darkMode": "ダーク",
+  "lightMode": "ライト",
+  "autoMode": "システム",
   "languageZh": "中文",
   "languageEn": "English",
   "languageJa": "日本語"

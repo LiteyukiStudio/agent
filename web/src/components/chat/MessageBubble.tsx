@@ -3,8 +3,9 @@ import { useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Bot, ChevronDown, ChevronRight, ExternalLink, User } from 'lucide-react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { ToolCallCard } from '@/components/chat/ToolCallCard'
+import { useAuth } from '@/hooks/useAuth'
 import type { Message } from '@/types/chat'
 
 interface MessageBubbleProps {
@@ -64,10 +65,12 @@ const markdownComponents = { a: MarkdownLink }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user'
+  const { user } = useAuth()
 
   return (
     <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
       <Avatar className="mt-0.5 size-8 shrink-0">
+        {isUser && user?.avatar_url && <AvatarImage src={user.avatar_url} alt={user.username} />}
         <AvatarFallback className={isUser ? 'bg-primary text-primary-foreground' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300'}>
           {isUser ? <User className="size-4" /> : <Bot className="size-4" />}
         </AvatarFallback>

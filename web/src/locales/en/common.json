@@ -24,8 +24,10 @@
   "copy": "Copy",
   "disclaimer": "Liteyuki Flow Agent may make mistakes. Verify important operations.",
   "language": "Language",
-  "darkMode": "Dark mode",
-  "lightMode": "Light mode",
+  "theme": "Theme",
+  "darkMode": "Dark",
+  "lightMode": "Light",
+  "autoMode": "System",
   "languageZh": "中文",
   "languageEn": "English",
   "languageJa": "日本語"

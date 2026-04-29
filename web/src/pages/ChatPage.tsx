@@ -69,7 +69,7 @@ export function ChatPage() {
 
   return (
     <div className="flex h-dvh overflow-hidden bg-background">
-      <div className="hidden md:block">
+      <div className="hidden md:block border-r">
         {sidebarContent}
       </div>
 
@@ -85,7 +85,7 @@ export function ChatPage() {
         >
           <Menu className="size-5" />
         </SheetTrigger>
-        <SheetContent side="left" className="w-[280px] p-0 border-r-0" showCloseButton={false}>
+        <SheetContent side="left" className="!w-[280px] !border-r-0 p-0" showCloseButton={false}>
           <SheetTitle className="sr-only">Navigation</SheetTitle>
           {sidebarContent}
         </SheetContent>

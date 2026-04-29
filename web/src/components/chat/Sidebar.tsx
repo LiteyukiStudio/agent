@@ -8,6 +8,7 @@ import {
   Loader2,
   LogOut,
   MessageSquarePlus,
+  Monitor,
   Moon,
   Pencil,
   Settings,
@@ -77,15 +78,20 @@ export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession,
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
-  const [theme, setTheme] = useState(() =>
-    document.documentElement.classList.contains('dark') ? 'dark' : 'light',
-  )
+  const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
+    return (localStorage.getItem('theme') as 'light' | 'dark' | 'system') || 'system'
+  })
 
-  function toggleTheme() {
-    const next = theme === 'dark' ? 'light' : 'dark'
-    setTheme(next)
-    document.documentElement.classList.toggle('dark', next === 'dark')
-    localStorage.setItem('theme', next)
+  function applyTheme(mode: 'light' | 'dark' | 'system') {
+    setTheme(mode)
+    localStorage.setItem('theme', mode)
+    if (mode === 'system') {
+      const isDark = window.matchMedia('(prefers-color-scheme: dark)').matches
+      document.documentElement.classList.toggle('dark', isDark)
+    }
+    else {
+      document.documentElement.classList.toggle('dark', mode === 'dark')
+    }
   }
 
   function changeLanguage(lng: string) {
@@ -113,7 +119,7 @@ export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession,
   }
 
   return (
-    <div className="flex h-full w-[280px] flex-col border-r bg-sidebar">
+    <div className="flex h-full w-[280px] flex-col bg-sidebar">
       {/* 顶部品牌 */}
       <div className="flex h-14 items-center gap-2.5 px-4">
         <div className="flex size-8 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900">
@@ -253,12 +259,30 @@ export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession,
 
             <DropdownMenuSeparator />
 
-            <DropdownMenuItem onClick={toggleTheme}>
-              {theme === 'dark'
-                ? <Sun className="mr-2 size-4" />
-                : <Moon className="mr-2 size-4" />}
-              {theme === 'dark' ? tc('lightMode') : tc('darkMode')}
-            </DropdownMenuItem>
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                {theme === 'dark'
+                  ? <Moon className="mr-2 size-4" />
+                  : theme === 'light'
+                    ? <Sun className="mr-2 size-4" />
+                    : <Monitor className="mr-2 size-4" />}
+                {tc('theme')}
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent>
+                <DropdownMenuItem onClick={() => applyTheme('light')}>
+                  <Sun className="mr-2 size-4" />
+                  {tc('lightMode')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => applyTheme('dark')}>
+                  <Moon className="mr-2 size-4" />
+                  {tc('darkMode')}
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => applyTheme('system')}>
+                  <Monitor className="mr-2 size-4" />
+                  {tc('autoMode')}
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
 
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
