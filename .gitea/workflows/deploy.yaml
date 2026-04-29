@@ -30,7 +30,7 @@ env:
   FRONTEND_TAG: git.liteyuki.org/liteyuki-docker/liteyuki-agent-frontend:latest
   BACKEND_NAME: liteyuki-agent-backend
   FRONTEND_NAME: liteyuki-agent-frontend
-  BACKEND_OPTIONS: --network liteyuki-network --network liteyuki6-network --restart=always --env-file /opt/dockers/liteyuki-agent/.env -v /opt/dockers/liteyuki-agent/data:/app/data ${{ secrets.ADDITIONAL_BACKEND_OPTIONS }}
+  BACKEND_OPTIONS: --network liteyuki-network --network liteyuki6-network --restart=always -v /opt/dockers/liteyuki-agent/.env:/app/.env:ro -v /opt/dockers/liteyuki-agent/data:/app/data ${{ secrets.ADDITIONAL_BACKEND_OPTIONS }}
   FRONTEND_OPTIONS: --network liteyuki-network --network liteyuki6-network --restart=always ${{ secrets.ADDITIONAL_FRONTEND_OPTIONS }}
 
 jobs:
