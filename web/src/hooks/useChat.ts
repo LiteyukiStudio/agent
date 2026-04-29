@@ -111,12 +111,12 @@ export function useChat() {
     setActiveSessionId(id)
   }, [])
 
-  const createSession = useCallback(async () => {
+  const createSession = useCallback(async (): Promise<Session | null> => {
     // 防止重复创建：如果当前会话为空（无消息），不新建
     if (activeSessionId) {
       const msgs = messagesBySession[activeSessionId]
       if (!msgs || msgs.length === 0) {
-        return
+        return null
       }
     }
 
@@ -132,9 +132,11 @@ export function useChat() {
       }
       setSessions(prev => [newSession, ...prev])
       setActiveSessionId(data.id)
+      return newSession
     }
     catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create session')
+      return null
     }
   }, [activeSessionId, messagesBySession])
 

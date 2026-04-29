@@ -20,46 +20,40 @@ export function ChatPage() {
 
   useTitle(activeSession?.title || 'Chat')
 
-  // Sync URL → activeSession
+  // URL → state: URL 中的 sessionId 变化时，同步到 activeSession
   useEffect(() => {
     if (sessionId && sessionId !== activeSession?.id) {
       setActiveSession(sessionId)
     }
-  }, [sessionId, activeSession?.id, setActiveSession])
+  }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-select first session when landing on /
+  // 首页 / 无 sessionId 时，自动跳转到第一个会话
   useEffect(() => {
-    if (!sessionId && sessions.length > 0 && !activeSession) {
+    if (!sessionId && sessions.length > 0) {
       navigate(`/session/${sessions[0].id}`, { replace: true })
     }
-  }, [sessionId, sessions, activeSession, navigate])
+  }, [sessionId, sessions.length]) // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleSelectSession(id: string) {
     navigate(`/session/${id}`)
     setMobileOpen(false)
   }
 
-  function handleNewSession() {
-    createSession().then(() => {
-      // After creation, the newest session is first in the list
-      // useChat will set it as active, then we sync URL
-    })
+  async function handleNewSession() {
+    const newSession = await createSession()
+    if (newSession) {
+      navigate(`/session/${newSession.id}`)
+    }
     setMobileOpen(false)
   }
 
   function handleDeleteSession(id: string) {
     deleteSession(id)
     if (activeSession?.id === id) {
+      // 删除当前会话后，跳转到首页（会自动选第一个）
       navigate('/', { replace: true })
     }
   }
-
-  // Sync activeSession → URL (for createSession)
-  useEffect(() => {
-    if (activeSession && activeSession.id !== sessionId) {
-      navigate(`/session/${activeSession.id}`, { replace: true })
-    }
-  }, [activeSession, sessionId, navigate])
 
   const sidebarContent = (
     <Sidebar

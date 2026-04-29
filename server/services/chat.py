@@ -427,16 +427,30 @@ async def stream_response(
             if chat_session:
                 if assistant_text:
                     chat_session.last_message = assistant_text[:200]
-                # AI 自动生成标题：仅在用户未手动修改且标题仍为默认值时
-                if not chat_session.title_custom and chat_session.title == "New Chat" and content.strip():
-                    from server.services.title_gen import generate_title
 
-                    ai_title = await generate_title(content, assistant_text)
-                    if ai_title:
-                        chat_session.title = ai_title
-                    else:
-                        # 兜底：用脱敏的截取
-                        chat_session.title = "新对话"
+                # AI 自动生成/更新标题（用户手动改过的不动）
+                # 第 1 轮立即生成，之后每 5 轮更新一次以跟踪主题变化
+                if not chat_session.title_custom and content.strip():
+                    # 统计当前会话的消息轮次（user 消息数）
+                    from sqlalchemy import func as sa_func
+
+                    count_result = await db.execute(
+                        select(sa_func.count())
+                        .select_from(Message)
+                        .where(Message.session_id == session_id, Message.role == "user"),
+                    )
+                    msg_count = count_result.scalar() or 0
+
+                    should_update = msg_count == 1 or (msg_count > 0 and msg_count % 5 == 0)
+                    if should_update:
+                        from server.services.title_gen import generate_title
+
+                        ai_title = await generate_title(content, assistant_text)
+                        if ai_title:
+                            chat_session.title = ai_title
+                        elif chat_session.title == "New Chat":
+                            chat_session.title = "新对话"
+
                 await db.commit()
 
         # 获取更新后的标题（用于通知前端）
