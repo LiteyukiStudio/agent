@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { apiDelete, apiGet, apiPatch, apiPost, streamSSE } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
@@ -56,6 +56,7 @@ export function useChat() {
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [messagesBySession, setMessagesBySession] = useState<Record<string, Message[]>>({})
+  const abortRef = useRef<AbortController | null>(null)
 
   // 在用户认证完成后才加载 sessions
   useEffect(() => {
@@ -191,6 +192,8 @@ export function useChat() {
     })
 
     setIsLoading(true)
+    const abortController = new AbortController()
+    abortRef.current = abortController
 
     const assistantMsgId = `assistant-${Date.now()}`
     let assistantContent = ''
@@ -221,7 +224,7 @@ export function useChat() {
     }
 
     try {
-      for await (const event of streamSSE(`/api/v1/chat/sessions/${sid}/messages`, { content: content.trim() })) {
+      for await (const event of streamSSE(`/api/v1/chat/sessions/${sid}/messages`, { content: content.trim() }, abortController.signal)) {
         const eventType = event.event as string
 
         if (eventType === 'thinking') {
@@ -262,7 +265,13 @@ export function useChat() {
       }
     }
     catch (err) {
-      assistantContent += `\n\n**Error:** ${err instanceof Error ? err.message : 'Unknown error'}`
+      // AbortError 是用户主动打断，不显示错误
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        // 用户主动中断，不追加错误信息
+      }
+      else {
+        assistantContent += `\n\n**Error:** ${err instanceof Error ? err.message : 'Unknown error'}`
+      }
     }
 
     // Final update
@@ -278,7 +287,15 @@ export function useChat() {
     }))
 
     setIsLoading(false)
+    abortRef.current = null
   }, [activeSessionId, isLoading])
+
+  const stopGeneration = useCallback(() => {
+    if (abortRef.current) {
+      abortRef.current.abort()
+      abortRef.current = null
+    }
+  }, [])
 
   const togglePublic = useCallback(async (sessionId: string) => {
     const session = sessions.find(s => s.id === sessionId)
@@ -305,6 +322,7 @@ export function useChat() {
     deleteSession,
     renameSession,
     sendMessage,
+    stopGeneration,
     togglePublic,
   }
 }

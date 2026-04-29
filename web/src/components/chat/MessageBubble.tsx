@@ -2,14 +2,17 @@ import type { ComponentPropsWithoutRef } from 'react'
 import { useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Bot, ChevronDown, ChevronRight, ExternalLink, User } from 'lucide-react'
+import { Bot, ChevronDown, ChevronRight, ClipboardCopy, ExternalLink, RefreshCw, User } from 'lucide-react'
+import { toast } from 'sonner'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import { ToolCallCard } from '@/components/chat/ToolCallCard'
 import { useAuth } from '@/hooks/useAuth'
 import type { Message } from '@/types/chat'
 
 interface MessageBubbleProps {
   message: Message
+  onRegenerate?: () => void
 }
 
 function ThinkingBlock({ content }: { content: string }) {
@@ -63,12 +66,17 @@ function MarkdownLink({ href, children, ...props }: ComponentPropsWithoutRef<'a'
 
 const markdownComponents = { a: MarkdownLink }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, onRegenerate }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const { user } = useAuth()
 
+  function handleCopy() {
+    navigator.clipboard.writeText(message.content)
+    toast.success('Copied')
+  }
+
   return (
-    <div className={`flex gap-3 min-w-0 ${isUser ? 'flex-row-reverse' : ''}`}>
+    <div className={`group/msg flex gap-3 min-w-0 ${isUser ? 'flex-row-reverse' : ''}`}>
       <Avatar className="mt-0.5 size-8 shrink-0">
         {isUser && user?.avatar_url && <AvatarImage src={user.avatar_url} alt={user.username} />}
         <AvatarFallback className={isUser ? 'bg-primary text-primary-foreground' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300'}>
@@ -108,9 +116,32 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           </div>
         )}
 
-        <p className="px-1 text-[11px] text-muted-foreground">
-          {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </p>
+        {/* 时间 + 操作按钮 */}
+        <div className={`flex items-center gap-1 px-1 ${isUser ? 'flex-row-reverse' : ''}`}>
+          <span className="text-[11px] text-muted-foreground">
+            {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </span>
+          <div className="flex gap-0.5 opacity-0 transition-opacity group-hover/msg:opacity-100">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6 text-muted-foreground hover:text-foreground"
+              onClick={handleCopy}
+            >
+              <ClipboardCopy className="size-3" />
+            </Button>
+            {!isUser && onRegenerate && (
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-6 text-muted-foreground hover:text-foreground"
+                onClick={onRegenerate}
+              >
+                <RefreshCw className="size-3" />
+              </Button>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   )

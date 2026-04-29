@@ -13,10 +13,11 @@ interface ChatAreaProps {
   session: Session | null
   isLoading: boolean
   onSend: (content: string) => void
+  onStop?: () => void
   onTogglePublic?: (sessionId: string) => void
 }
 
-export function ChatArea({ session, isLoading, onSend, onTogglePublic }: ChatAreaProps) {
+export function ChatArea({ session, isLoading, onSend, onStop, onTogglePublic }: ChatAreaProps) {
   const { t } = useTranslation('chat')
   const { t: tc } = useTranslation('common')
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -119,7 +120,7 @@ export function ChatArea({ session, isLoading, onSend, onTogglePublic }: ChatAre
       </ScrollArea>
 
       {/* Input */}
-      <ChatInput onSend={onSend} isLoading={isLoading} />
+      <ChatInput onSend={onSend} onStop={onStop} isLoading={isLoading} />
     </div>
   )
 }

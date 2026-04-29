@@ -1,17 +1,18 @@
 import type { KeyboardEvent } from 'react'
 import { useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowUp, Loader2 } from 'lucide-react'
+import { ArrowUp, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 
 interface ChatInputProps {
   onSend: (content: string) => void
+  onStop?: () => void
   isLoading: boolean
   disabled?: boolean
 }
 
-export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
+export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProps) {
   const { t } = useTranslation('chat')
   const { t: tc } = useTranslation('common')
   const [value, setValue] = useState('')
@@ -40,6 +41,9 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
     [handleSend],
   )
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+  const placeholder = isMobile ? t('placeholderShort') : t('placeholder')
+
   return (
     <div className="border-t bg-background p-4">
       <div className="mx-auto flex max-w-3xl items-end gap-2">
@@ -49,7 +53,7 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
             value={value}
             onChange={e => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder={t('placeholder')}
+            placeholder={placeholder}
             className="min-h-[44px] max-h-[200px] resize-none pr-4 text-base md:text-sm"
             rows={1}
             disabled={disabled}
@@ -60,14 +64,27 @@ export function ChatInput({ onSend, isLoading, disabled }: ChatInputProps) {
             }}
           />
         </div>
-        <Button
-          size="icon"
-          onClick={handleSend}
-          disabled={!value.trim() || isLoading || disabled}
-          className="size-[44px] shrink-0 rounded-xl"
-        >
-          {isLoading ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
-        </Button>
+        {isLoading
+          ? (
+              <Button
+                size="icon"
+                variant="destructive"
+                onClick={onStop}
+                className="size-[44px] shrink-0 rounded-xl"
+              >
+                <Square className="size-4" />
+              </Button>
+            )
+          : (
+              <Button
+                size="icon"
+                onClick={handleSend}
+                disabled={!value.trim() || disabled}
+                className="size-[44px] shrink-0 rounded-xl"
+              >
+                <ArrowUp className="size-4" />
+              </Button>
+            )}
       </div>
       <p className="mx-auto mt-2 max-w-3xl text-center text-[11px] text-muted-foreground">
         {tc('disclaimer')}

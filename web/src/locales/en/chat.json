@@ -1,6 +1,7 @@
 {
   "newChat": "New Chat",
   "placeholder": "Type a message... (Shift+Enter for newline)",
+  "placeholderShort": "Type a message",
   "send": "Send",
   "noMessages": "Send a message to start the conversation",
   "selectSession": "Select a session or create a new one to get started",

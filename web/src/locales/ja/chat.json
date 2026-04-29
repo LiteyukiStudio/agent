@@ -1,6 +1,7 @@
 {
   "newChat": "新しいチャット",
   "placeholder": "メッセージを入力... (Shift+Enterで改行)",
+  "placeholderShort": "メッセージを入力",
   "send": "送信",
   "noMessages": "メッセージを送信して会話を始めましょう",
   "selectSession": "セッションを選択するか、新しいセッションを作成してください",

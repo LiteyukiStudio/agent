@@ -50,7 +50,7 @@ export function apiDelete<T = void>(path: string): Promise<T> {
   return request<T>('DELETE', path)
 }
 
-export async function* streamSSE(path: string, body: unknown): AsyncGenerator<Record<string, unknown>> {
+export async function* streamSSE(path: string, body: unknown, signal?: AbortSignal): AsyncGenerator<Record<string, unknown>> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const token = getToken()
   if (token)
@@ -60,6 +60,7 @@ export async function* streamSSE(path: string, body: unknown): AsyncGenerator<Re
     method: 'POST',
     headers,
     body: JSON.stringify(body),
+    signal,
   })
 
   if (!res.ok) {

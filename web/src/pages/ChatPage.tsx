@@ -14,7 +14,7 @@ export function ChatPage() {
   const {
     sessions, activeSession, isLoading,
     setActiveSession, createSession, deleteSession,
-    renameSession, sendMessage, togglePublic,
+    renameSession, sendMessage, stopGeneration, togglePublic,
   } = useChat()
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -96,6 +96,7 @@ export function ChatPage() {
           session={activeSession}
           isLoading={isLoading}
           onSend={sendMessage}
+          onStop={stopGeneration}
           onTogglePublic={togglePublic}
         />
       </div>

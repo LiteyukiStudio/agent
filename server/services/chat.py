@@ -295,8 +295,10 @@ async def stream_response(
     assistant_text = ""
     # 收集工具调用数据
     collected_tool_calls: list[dict] = []
-    # 跟踪哪些 sub_agent 已经产出过文本，用于去重 root_agent 的转发
-    seen_sub_agents: set[str] = set()
+    # 去重：SSE 流式模式下 ADK 先发 partial=True 的逐 token 事件，
+    # 最后发 partial=False/None 的完整文本事件，导致内容重复。
+    # 只输出 partial 事件（流式 token），跳过最终的完整事件。
+    has_partial_text = False
 
     try:
         async for event in runner.run_async(
@@ -306,6 +308,26 @@ async def stream_response(
             state_delta=injected_state,
             run_config=RunConfig(streaming_mode=StreamingMode.SSE),
         ):
+            # 调试：记录每个 ADK event 的基本信息
+            parts_summary = ""
+            if event.content and event.content.parts:
+                parts_summary = ", ".join(
+                    f"text({len(p.text)})"
+                    if p.text
+                    else f"func_call({p.function_call.name})"
+                    if p.function_call
+                    else f"func_resp({p.function_response.name})"
+                    if p.function_response
+                    else "other"
+                    for p in event.content.parts
+                )
+            logger.info(
+                "ADK event: author=%s, parts=[%s], actions=%s",
+                event.author,
+                parts_summary,
+                bool(event.actions and event.actions.state_delta),
+            )
+
             # 提取 token 用量（如果事件包含）
             if hasattr(event, "usage_metadata") and event.usage_metadata:
                 total_input_tokens += getattr(event.usage_metadata, "prompt_token_count", 0) or 0
@@ -329,31 +351,36 @@ async def stream_response(
                         )
 
             # 提取内容
-            # SSE 流式模式下，ADK 会为每个 agent 分别发送事件：
-            # 1. sub_agent 产出原始文本（author = sub_agent 名称）
-            # 2. root_agent 转发同样的文本（author = "root_agent"）
-            # 只保留 sub_agent 的原始输出，跳过 root_agent 的转发。
+            # ADK SSE 流式模式下的事件结构：
+            # 1. 多个 partial=True 事件，每个含一小段 token（流式输出）
+            # 2. 一个 partial=False/None 事件，含完整文本（汇总）
+            # 只输出 partial 事件避免重复；如果没有 partial 事件才输出完整事件。
             if event.content and event.content.parts:
                 author = event.author or "assistant"
-
-                # 记录产出过文本的 sub_agent
-                if author != "root_agent":
-                    seen_sub_agents.add(author)
+                is_partial = bool(event.partial)
 
                 for part in event.content.parts:
                     if part.text:
                         text = part.text
 
-                        # 如果有 sub_agent 已输出过内容，跳过 root_agent 的所有文本
-                        # （root_agent 在 transfer 场景下只是转发）
-                        if author == "root_agent" and seen_sub_agents:
-                            logger.debug("skip root_agent relay: %s...", text[:50])
+                        if is_partial:
+                            # 流式 token，正常输出
+                            has_partial_text = True
+                        elif has_partial_text:
+                            # 非 partial 的完整文本，但之前已经输出过 partial token
+                            # 这是 ADK 的汇总事件，跳过以避免重复
+                            logger.debug(
+                                "skip non-partial summary event: author=%s len=%d",
+                                author,
+                                len(text),
+                            )
                             continue
 
                         # 区分思考过程和正式回复
                         is_thinking = bool(part.thought)
                         if not is_thinking:
                             assistant_text += text
+
                         sse_data = json.dumps(
                             {
                                 "event": "thinking" if is_thinking else "text",
