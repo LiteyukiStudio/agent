@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { useTitle } from '@/hooks/useTitle'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 
 interface QuotaPlan {
@@ -33,6 +34,7 @@ function formatTokens(n: number | null): string {
 
 export function QuotaPage() {
   const { t: tc } = useTranslation('common')
+  useTitle('Quota Plans')
   const [plans, setPlans] = useState<QuotaPlan[]>([])
   const [form, setForm] = useState({ name: '', daily_tokens: '', weekly_tokens: '', monthly_tokens: '', requests_per_minute: '10' })
   const [dialogOpen, setDialogOpen] = useState(false)

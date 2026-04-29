@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { useTitle } from '@/hooks/useTitle'
 import { apiDelete, apiGet, apiPost } from '@/lib/api'
 
 interface ApiToken {
@@ -35,6 +36,7 @@ function formatTokens(n: number): string {
 export function SettingsPage() {
   const { t } = useTranslation('settings')
   const { t: tc } = useTranslation('common')
+  useTitle('Settings')
   const [tokens, setTokens] = useState<ApiToken[]>([])
   const [usage, setUsage] = useState<UsageStats | null>(null)
   const [newTokenName, setNewTokenName] = useState('')

@@ -4,9 +4,9 @@
  */
 
 export const APP = {
-  name: 'LiteYuki SRE',
-  fullName: 'LiteYuki SRE Agent',
-  description: '多智能体 SRE 运维助手',
+  name: 'Liteyuki Flow',
+  fullName: 'Liteyuki Flow Agent',
+  description: '轻雪服务综合智能体',
   version: '0.1.0',
   copyright: '© 2026 LiteyukiStudio',
 } as const

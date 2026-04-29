@@ -11,19 +11,19 @@ misskey_agent = Agent(
     name="misskey_agent",
     description="Misskey 社交平台操作助手，可以发帖、查看时间线、搜索用户、管理通知和文件等。",
     instruction="""\
-你是 Misskey 社交平台的操作助手。
+你是轻雪社区（https://lab.liteyuki.org）的 Misskey 社交平台操作助手。
 
 ## 首次使用
-先通过 show_misskey_config 检查用户是否已经配置了 Misskey 连接信息（base_url 和 API Token）。
-如果用户还没有配置 Misskey 连接信息，先引导用户提供：
-1. Misskey 实例地址（base_url），如果用户未提供就使用 https://lab.liteyuki.org 作为默认实例\
-（这个实例也叫轻雪社区，当用户提到轻雪社区时用本Agent）。
-2. 如果用户没有提供 API Token，根据提供的 base_url（默认值也要）\
-拼接一个 Token 生成地址：$base_url/settings/connect 给用户（一定要生成可点击链接给用户，保证体验最好），\
+先通过 show_misskey_config 检查用户是否已经配置了 API Token。
+如果还没有配置，引导用户提供 API Token：
+1. 给用户生成 Token 创建链接：\
+https://lab.liteyuki.org/settings/api（一定要生成可点击链接），\
 引导用户在该页面创建 Access Token，权限建议全选或按需选择。
-    如果 base_url 和 Token 一起提供的话就更好了。
-    然后调用 setup_misskey 保存配置。没有 Token 也可以浏览公开内容（如本地时间线）。
-3. 提供 API Token 后，应该调用 get_me 获取当前认证的用户信息，确认 Token 的有效性。
+2. 用户提供 Token 后，调用 setup_misskey(token=...) 保存配置。\
+不需要让用户提供 base_url，默认使用 https://lab.liteyuki.org。\
+**只有当用户主动要求切换到其他 Misskey 实例时**，才询问并传入 base_url 参数。
+3. 保存后调用 get_me 确认 Token 有效性。
+4. 没有 Token 也可以浏览公开内容（如本地时间线）。
 
 ## 功能
 你可以帮助用户完成以下操作：

@@ -9,8 +9,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from server.config import settings
 from server.deps import get_db, require_admin
 from server.schemas.admin import (
-    AccessListEntryCreate,
-    AccessListEntryResponse,
     OAuthProviderCreate,
     OAuthProviderResponse,
     OAuthProviderUpdate,
@@ -28,10 +26,13 @@ if TYPE_CHECKING:
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
 
-def _provider_response(provider: OAuthProvider) -> OAuthProviderResponse:
-    """将 ORM 对象转为响应模型，附加 callback_url。"""
+async def _provider_response(provider: OAuthProvider, db: AsyncSession) -> OAuthProviderResponse:
+    """将 ORM 对象转为响应模型，附加 callback_url 和 allowed_groups。"""
     resp = OAuthProviderResponse.model_validate(provider)
     resp.callback_url = f"{settings.server_host}/api/v1/auth/oauth/callback/{provider.id}"
+    # 从 access_list_entries 读取 groups 拼成逗号分隔字符串
+    entries = await admin_service.list_access_entries(db, provider.id)
+    resp.allowed_groups = ",".join(e.group_name for e in entries)
     return resp
 
 
@@ -47,7 +48,7 @@ async def list_providers(
 ) -> list[OAuthProviderResponse]:
     """列出所有 OAuth 提供商（仅管理员）。"""
     providers = await admin_service.list_providers(db)
-    return [_provider_response(p) for p in providers]
+    return [await _provider_response(p, db) for p in providers]
 
 
 @router.post("/oauth-providers", response_model=OAuthProviderResponse, status_code=status.HTTP_201_CREATED)
@@ -58,7 +59,10 @@ async def create_provider(
 ) -> OAuthProviderResponse:
     """创建新的 OAuth 提供商，自动进行 OIDC 发现（仅管理员）。"""
     provider = await admin_service.create_provider(db, body)
-    return _provider_response(provider)
+    # 同步 groups 到 access_list_entries
+    if body.allowed_groups:
+        await admin_service.sync_access_groups(db, provider.id, body.allowed_groups)
+    return await _provider_response(provider, db)
 
 
 @router.patch("/oauth-providers/{provider_id}", response_model=OAuthProviderResponse)
@@ -72,7 +76,10 @@ async def update_provider(
     provider = await admin_service.update_provider(db, provider_id, body)
     if provider is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Provider not found")
-    return _provider_response(provider)
+    # 同步 groups（传了 allowed_groups 字段才同步）
+    if body.allowed_groups is not None:
+        await admin_service.sync_access_groups(db, provider.id, body.allowed_groups)
+    return await _provider_response(provider, db)
 
 
 @router.delete("/oauth-providers/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -165,51 +172,3 @@ async def update_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return UserResponse.model_validate(user)
-
-
-# ---------------------------------------------------------------------------
-# 访问名单
-# ---------------------------------------------------------------------------
-
-
-@router.get("/oauth-providers/{provider_id}/access-list", response_model=list[AccessListEntryResponse])
-async def list_access_entries(
-    provider_id: str,
-    _user: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
-) -> list[AccessListEntryResponse]:
-    """列出 OAuth 提供商的访问名单（仅管理员）。"""
-    entries = await admin_service.list_access_entries(db, provider_id)
-    return [AccessListEntryResponse.model_validate(e) for e in entries]
-
-
-@router.post(
-    "/oauth-providers/{provider_id}/access-list",
-    response_model=AccessListEntryResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-async def add_access_entry(
-    provider_id: str,
-    body: AccessListEntryCreate,
-    _user: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
-) -> AccessListEntryResponse:
-    """添加访问名单条目（仅管理员）。"""
-    entry = await admin_service.add_access_entry(db, provider_id, body)
-    return AccessListEntryResponse.model_validate(entry)
-
-
-@router.delete(
-    "/oauth-providers/{provider_id}/access-list/{entry_id}",
-    status_code=status.HTTP_204_NO_CONTENT,
-)
-async def remove_access_entry(
-    provider_id: str,
-    entry_id: str,
-    _user: User = Depends(require_admin),
-    db: AsyncSession = Depends(get_db),
-) -> None:
-    """删除访问名单条目（仅管理员）。"""
-    deleted = await admin_service.remove_access_entry(db, provider_id, entry_id)
-    if not deleted:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Entry not found")

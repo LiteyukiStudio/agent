@@ -226,3 +226,34 @@ async def remove_access_entry(db: AsyncSession, provider_id: str, entry_id: str)
     await db.delete(entry)
     await db.commit()
     return True
+
+
+async def sync_access_groups(db: AsyncSession, provider_id: str, groups_csv: str) -> None:
+    """同步 access_list_entries 表：以逗号分隔的 groups 字符串为准。
+
+    删除不在列表中的旧条目，添加新条目。空字符串表示清空所有条目。
+    """
+
+    # 解析目标 group 列表
+    target_groups = {g.strip().lower() for g in groups_csv.split(",") if g.strip()}
+
+    # 获取现有条目
+    result = await db.execute(
+        select(AccessListEntry).where(AccessListEntry.provider_id == provider_id),
+    )
+    existing = list(result.scalars().all())
+    existing_groups = {e.group_name.lower(): e for e in existing}
+
+    # 删除不在目标列表中的
+    for group_lower, entry in existing_groups.items():
+        if group_lower not in target_groups:
+            await db.delete(entry)
+
+    # 添加新的
+    for group in target_groups:
+        if group not in existing_groups:
+            # 保持原始大小写（从 csv 中取 strip 后的值）
+            original = next(g.strip() for g in groups_csv.split(",") if g.strip().lower() == group)
+            db.add(AccessListEntry(provider_id=provider_id, group_name=original))
+
+    await db.commit()

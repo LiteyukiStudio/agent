@@ -1,6 +1,6 @@
-# LiteYuki SRE Agent — 前端
+# Liteyuki Flow Agent — 前端
 
-LiteYuki SRE Agent 的 Web 聊天界面，提供多用户登录、AI 对话、管理后台等功能。
+Liteyuki Flow Agent 的 Web 聊天界面，提供多用户登录、AI 对话、管理后台等功能。
 
 ## 技术栈
 

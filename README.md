@@ -1,4 +1,4 @@
-# LiteYuki SRE Agent
+# Liteyuki Flow Agent
 
 基于 [Google ADK](https://github.com/google/adk-python) 的多智能体 SRE 运维助手，支持 Gitea 代码托管管理、社区运营、容器镜像站等基础设施的智能化运维。提供完整的 Web 聊天界面，支持多用户、OAuth 登录、用量计费。
 

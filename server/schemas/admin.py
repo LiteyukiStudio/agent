@@ -19,6 +19,7 @@ class OAuthProviderCreate(BaseModel):
     client_id: str
     client_secret: str
     access_mode: str = "whitelist"  # whitelist 或 blacklist
+    allowed_groups: str = ""  # 逗号分隔的 OIDC group 名单
 
 
 class OAuthProviderUpdate(BaseModel):
@@ -30,6 +31,7 @@ class OAuthProviderUpdate(BaseModel):
     client_secret: str | None = None
     enabled: bool | None = None
     access_mode: str | None = None
+    allowed_groups: str | None = None  # 逗号分隔的 OIDC group 名单
 
 
 class OAuthProviderResponse(BaseModel):
@@ -41,36 +43,13 @@ class OAuthProviderResponse(BaseModel):
     client_id: str
     enabled: bool
     access_mode: str
+    allowed_groups: str = ""  # 逗号分隔的 OIDC group 名单
     authorization_endpoint: str | None = None
     token_endpoint: str | None = None
     userinfo_endpoint: str | None = None
     callback_url: str | None = None  # 由 router 层填充
     created_at: datetime
     updated_at: datetime
-
-    model_config = {"from_attributes": True}
-
-
-# ---------------------------------------------------------------------------
-# 访问名单
-# ---------------------------------------------------------------------------
-
-
-class AccessListEntryCreate(BaseModel):
-    """添加 Group 名单条目。"""
-
-    group_name: str  # OIDC group 名称
-    note: str | None = None
-
-
-class AccessListEntryResponse(BaseModel):
-    """Group 名单条目响应。"""
-
-    id: str
-    provider_id: str
-    group_name: str
-    note: str | None = None
-    created_at: datetime
 
     model_config = {"from_attributes": True}
 

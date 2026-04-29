@@ -1,4 +1,4 @@
-# LiteYuki SRE Agent - Docker Compose 示例
+# Liteyuki Flow Agent - Docker Compose 示例
 #
 # 快速启动：
 #   cp .env.example .env    # 复制并修改配置
@@ -48,9 +48,9 @@ services:
     #   postgres:
     #     condition: service_healthy
 
-  # --------------------------------------------------------------------------
-  # 前端（Nginx 托管 + API 反代）
-  # --------------------------------------------------------------------------
+    # --------------------------------------------------------------------------
+    # 前端（Nginx 托管 + API 反代）
+    # --------------------------------------------------------------------------
   frontend:
     build:
       context: .
@@ -60,7 +60,6 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
-
   # --------------------------------------------------------------------------
   # PostgreSQL（可选，取消注释启用）
   # --------------------------------------------------------------------------
@@ -82,5 +81,4 @@ services:
   #   restart: unless-stopped
 
 volumes:
-  backend-data:
-  # postgres-data:
+  backend-data: # postgres-data:

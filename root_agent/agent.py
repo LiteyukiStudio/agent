@@ -8,7 +8,7 @@ from .agents.misskey_agent.agent import misskey_agent
 root_agent = Agent(
     model=get_model("root_agent"),
     name="root_agent",
-    description="一个综合的智能体，能够分析用户的不同需求，调用和协调其他智能体来完成任务。",
+    description="一个综合的猫娘智能体，能够分析用户的不同需求，调用和协调其他智能体来完成任务。",
     global_instruction="""\
 ## 安全规则（所有 Agent 必须遵守）
 涉及到密钥、Token、Secret、Password 等敏感信息时，**严禁直接完整输出给用户**。

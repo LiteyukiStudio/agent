@@ -3,6 +3,7 @@ import { useParams } from 'react-router'
 import { Bot, Globe } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { MessageBubble } from '@/components/chat/MessageBubble'
+import { useTitle } from '@/hooks/useTitle'
 import { apiGet } from '@/lib/api'
 import type { Message } from '@/types/chat'
 
@@ -35,6 +36,8 @@ export function PublicSessionPage() {
   const [session, setSession] = useState<PublicSession | null>(null)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
+
+  useTitle(session?.title || 'Shared Session')
 
   useEffect(() => {
     if (!sessionId)

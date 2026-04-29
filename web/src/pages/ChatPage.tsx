@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router'
 import { Menu } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { useTitle } from '@/hooks/useTitle'
 import { Sidebar } from '@/components/chat/Sidebar'
 import { ChatArea } from '@/components/chat/ChatArea'
 import { useChat } from '@/hooks/useChat'
@@ -16,6 +17,8 @@ export function ChatPage() {
     renameSession, sendMessage, togglePublic,
   } = useChat()
   const [mobileOpen, setMobileOpen] = useState(false)
+
+  useTitle(activeSession?.title || 'Chat')
 
   // Sync URL → activeSession
   useEffect(() => {

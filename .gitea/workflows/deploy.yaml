@@ -1,0 +1,112 @@
+# 打包容器镜像，推送到私有云镜像站，并在目标主机上部署
+# 需要的密钥变量
+# DOCKER_HOST
+# DOCKER_TLS_CA
+# DOCKER_TLS_CERT
+# DOCKER_TLS_KEY
+# GIT_CR_TOKEN: Gitea Container Registry Token
+# ADDITIONAL_BACKEND_OPTIONS: 后端容器额外参数（如环境变量）
+# ADDITIONAL_FRONTEND_OPTIONS: 前端容器额外参数
+# Author: s@liteyuki.org
+
+name: Build and Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: docker-build
+  cancel-in-progress: false
+
+env:
+  REGISTRY: git.liteyuki.org
+  REGISTRY_USER: snowykami
+  BACKEND_TAG: git.liteyuki.org/liteyuki-docker/liteyuki-sre-backend:latest
+  FRONTEND_TAG: git.liteyuki.org/liteyuki-docker/liteyuki-sre-frontend:latest
+  BACKEND_NAME: liteyuki-sre-backend
+  FRONTEND_NAME: liteyuki-sre-frontend
+  BACKEND_OPTIONS: --network liteyuki-network --restart=always -v /opt/dockers/liteyuki-sre/data:/app/data ${{ secrets.ADDITIONAL_BACKEND_OPTIONS }}
+  FRONTEND_OPTIONS: --network liteyuki-network --restart=always ${{ secrets.ADDITIONAL_FRONTEND_OPTIONS }}
+
+jobs:
+  build-and-deploy-backend:
+    runs-on: liteyukios-latest
+    steps:
+      - name: Checkout code
+        uses: https://git.liteyuki.org/actions/checkout@v4
+
+      - name: Set up Docker TLS
+        run: |
+          mkdir -p /certs
+          echo "${{ secrets.DOCKER_TLS_CA }}" > /certs/ca.pem
+          echo "${{ secrets.DOCKER_TLS_CERT }}" > /certs/cert.pem
+          echo "${{ secrets.DOCKER_TLS_KEY }}" > /certs/key.pem
+          chmod 600 /certs/key.pem
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ secrets.GIT_CR_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ env.BACKEND_TAG }}
+
+      - name: Deploy backend container
+        run: |
+          docker pull ${{ env.BACKEND_TAG }}
+          docker stop ${{ env.BACKEND_NAME }} || true
+          docker rm ${{ env.BACKEND_NAME }} || true
+          docker run -d --name ${{ env.BACKEND_NAME }} ${{ env.BACKEND_OPTIONS }} ${{ env.BACKEND_TAG }}
+
+  build-and-deploy-frontend:
+    runs-on: liteyukios-latest
+    steps:
+      - name: Checkout code
+        uses: https://git.liteyuki.org/actions/checkout@v4
+
+      - name: Set up Docker TLS
+        run: |
+          mkdir -p /certs
+          echo "${{ secrets.DOCKER_TLS_CA }}" > /certs/ca.pem
+          echo "${{ secrets.DOCKER_TLS_CERT }}" > /certs/cert.pem
+          echo "${{ secrets.DOCKER_TLS_KEY }}" > /certs/key.pem
+          chmod 600 /certs/key.pem
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ secrets.GIT_CR_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: web/Dockerfile
+          push: true
+          tags: ${{ env.FRONTEND_TAG }}
+
+      - name: Deploy frontend container
+        run: |
+          docker pull ${{ env.FRONTEND_TAG }}
+          docker stop ${{ env.FRONTEND_NAME }} || true
+          docker rm ${{ env.FRONTEND_NAME }} || true
+          docker run -d --name ${{ env.FRONTEND_NAME }} ${{ env.FRONTEND_OPTIONS }} ${{ env.FRONTEND_TAG }}

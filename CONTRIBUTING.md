@@ -51,6 +51,22 @@ uv run alembic current
 
 应用启动时会自动执行 `alembic upgrade head`，无需手动操作。
 
+### 变更后必须 Lint
+
+**任何代码变更后，必须对变更部分执行 lint 检查，确认通过后再提交。** 这是强制性规则，适用于所有开发者和 AI 编码助手。
+
+```bash
+# Python 变更
+uv run ruff check --fix <changed_files>
+uv run ruff format <changed_files>
+
+# 前端变更
+cd web && pnpm exec tsc --noEmit && npx eslint src/
+
+# 或一次性全量检查
+uv run pre-commit run --all-files
+```
+
 ## 通用
 
 - 缩进：Python 4 空格，TypeScript 2 空格

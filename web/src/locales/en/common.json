@@ -1,6 +1,6 @@
 {
-  "appName": "LiteYuki SRE",
-  "appFullName": "LiteYuki SRE Agent",
+  "appName": "Liteyuki Flow",
+  "appFullName": "Liteyuki Flow Agent",
   "description": "Multi-agent SRE assistant",
   "save": "Save",
   "cancel": "Cancel",
@@ -22,7 +22,7 @@
   "or": "or",
   "dismiss": "Dismiss",
   "copy": "Copy",
-  "disclaimer": "LiteYuki SRE Agent may make mistakes. Verify important operations.",
+  "disclaimer": "Liteyuki Flow Agent may make mistakes. Verify important operations.",
   "language": "Language",
   "darkMode": "Dark mode",
   "lightMode": "Light mode",

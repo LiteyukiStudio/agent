@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { apiGet, apiPatch } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
+import { useTitle } from '@/hooks/useTitle'
 
 interface UserItem {
   id: string
@@ -32,6 +33,7 @@ function formatTokens(n: number): string {
 
 export function UsersPage() {
   const { user: me } = useAuth()
+  useTitle('Users')
   const [users, setUsers] = useState<UserItem[]>([])
   const [stats, setStats] = useState<UsageStats | null>(null)
 

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { useAuth } from '@/hooks/useAuth'
+import { useTitle } from '@/hooks/useTitle'
 import { apiGet } from '@/lib/api'
 
 interface OAuthProvider {
@@ -20,6 +21,7 @@ export function LoginPage() {
   const { t: tc } = useTranslation('common')
   const { login, user } = useAuth()
   const navigate = useNavigate()
+  useTitle('Login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)

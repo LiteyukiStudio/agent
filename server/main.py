@@ -54,7 +54,7 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
 
 
 app = FastAPI(
-    title="LiteYuki SRE Agent API",
+    title="Liteyuki Flow Agent API",
     version="0.1.0",
     lifespan=lifespan,
 )

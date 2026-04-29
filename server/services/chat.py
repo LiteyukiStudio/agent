@@ -321,9 +321,18 @@ async def stream_response(
                         )
 
             # 提取内容
+            # 只处理最终面向用户的 agent 输出，跳过 sub_agent 的中间转发
+            # ADK 在 agent transfer 场景下，sub_agent 的回复会被 root_agent 重新发出
+            # 导致同一段文本出现两次（author 不同）。只取非 root_agent 的原始输出。
             if event.content and event.content.parts:
+                # 跳过 root_agent 转发的 sub_agent 内容（避免重复）
+                is_sub_agent_reply = bool(event.author and event.author != "root_agent")
+
                 for part in event.content.parts:
                     if part.text:
+                        # 如果是 root_agent 且之前已有 sub_agent 输出过相同内容，跳过
+                        if not is_sub_agent_reply and assistant_text and part.text in assistant_text:
+                            continue
                         # 区分思考过程和正式回复
                         is_thinking = bool(part.thought)
                         if not is_thinking:
