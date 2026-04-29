@@ -59,6 +59,7 @@ jobs:
       - name: Build binary
         working-directory: ${{ env.PACKAGE_DIR }}
         run: |
+          mkdir -p ../build
           bun build src/cli.tsx --compile --target=${{ matrix.bun_target }} --outfile=../build/${{ env.BIN_NAME }}-${{ matrix.target }}
 
       - name: Upload artifact
@@ -141,13 +142,8 @@ jobs:
           cd artifacts
           for f in *; do
             if [[ -f "$f" ]]; then
-              # Add version to filename and compress
-              if [[ "$f" == *"win"* ]]; then
-                cp "$f" "../release/${f}.exe"
-              else
-                chmod +x "$f"
-                cp "$f" "../release/$f"
-              fi
+              chmod +x "$f" 2>/dev/null || true
+              cp "$f" "../release/$f"
             fi
           done
           ls -la ../release/
