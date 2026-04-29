@@ -9,6 +9,7 @@ on:
 permissions:
   contents: write
   packages: write
+  id-token: write
 
 concurrency:
   group: local-agent-${{ github.ref }}
@@ -82,7 +83,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
+          node-version: "22.14"
           registry-url: "https://registry.npmjs.org"
 
       - name: Setup Bun
@@ -107,7 +108,7 @@ jobs:
 
       - name: Publish to npm (Trusted Publishing)
         working-directory: ${{ env.PACKAGE_DIR }}
-        run: npm publish --access public
+        run: npm publish --access public --provenance
 
   release:
     runs-on: ubuntu-latest
