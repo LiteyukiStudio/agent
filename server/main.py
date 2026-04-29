@@ -36,9 +36,13 @@ def _run_alembic_upgrade() -> None:
         db_path = db_url.split("///")[-1]
         Path(db_path).parent.mkdir(parents=True, exist_ok=True)
 
-    alembic_cfg = Config("alembic.ini")
-    command.upgrade(alembic_cfg, "head")
-    logger.info("Database migration completed (alembic upgrade head)")
+    try:
+        alembic_cfg = Config("alembic.ini")
+        command.upgrade(alembic_cfg, "head")
+        logger.info("Database migration completed (alembic upgrade head)")
+    except Exception:
+        logger.exception("Database migration FAILED")
+        raise
 
 
 @asynccontextmanager
