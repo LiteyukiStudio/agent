@@ -83,7 +83,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "22.14"
+          node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
       - name: Setup Bun
@@ -108,7 +108,7 @@ jobs:
 
       - name: Publish to npm (Trusted Publishing)
         working-directory: ${{ env.PACKAGE_DIR }}
-        run: npm publish --access public --provenance
+        run: npm publish --access public
 
   release:
     runs-on: ubuntu-latest
