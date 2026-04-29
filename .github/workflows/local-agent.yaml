@@ -52,7 +52,9 @@ jobs:
 
       - name: Install dependencies
         working-directory: ${{ env.PACKAGE_DIR }}
-        run: bun install
+        run: |
+          bun install
+          bun add react-devtools-core
 
       - name: Build binary
         working-directory: ${{ env.PACKAGE_DIR }}
