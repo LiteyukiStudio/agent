@@ -183,9 +183,18 @@ async def find_or_create_user(
     user = result.scalar_one_or_none()
 
     if user is not None:
-        # 更新可变字段
+        # 每次 OIDC 登录同步可变字段（email、头像、用户名）
         user.email = userinfo.get("email") or user.email
         user.avatar_url = userinfo.get("avatar_url") or userinfo.get("picture") or user.avatar_url
+        # 同步用户名（仅当 OIDC 返回了新名字且当前名字不同时更新）
+        new_username = userinfo.get("login") or userinfo.get("preferred_username") or ""
+        if new_username and new_username != user.username:
+            # 检查新名字是否被占用（被其他用户占了就不改）
+            conflict = await db.execute(
+                select(User).where(User.username == new_username, User.id != user.id),
+            )
+            if conflict.scalar_one_or_none() is None:
+                user.username = new_username
         await db.commit()
         await db.refresh(user)
         return user

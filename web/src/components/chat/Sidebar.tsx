@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -225,6 +225,7 @@ export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession,
                 className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors hover:bg-sidebar-accent"
               >
                 <Avatar className="size-7">
+                  {user?.avatar_url && <AvatarImage src={user.avatar_url} alt={user.username} />}
                   <AvatarFallback className="bg-primary text-primary-foreground text-xs">
                     {user?.username.slice(0, 2).toUpperCase() || '?'}
                   </AvatarFallback>
