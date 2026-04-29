@@ -57,7 +57,7 @@ async def generate_title(user_message: str, assistant_reply: str) -> str | None:
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
-            "max_tokens": 30,
+            "max_tokens": 100,
             "temperature": 0.3,
         }
         if token:
@@ -79,5 +79,5 @@ async def generate_title(user_message: str, assistant_reply: str) -> str | None:
         return title or None
 
     except Exception:
-        logger.warning("自动标题生成失败", exc_info=True)
+        logger.exception("自动标题生成失败 (model=%s, api_base=%s)", model_name, api_url)
         return None

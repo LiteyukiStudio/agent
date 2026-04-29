@@ -19,6 +19,7 @@ dependencies = [
     "bcrypt>=4.2",
     "alembic>=1.18.4",
     "psycopg2-binary>=2.9.12",
+    "trafilatura>=2.0",
 ]
 
 [dependency-groups]

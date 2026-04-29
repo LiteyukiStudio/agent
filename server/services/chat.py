@@ -489,11 +489,14 @@ async def stream_response(
                     if should_update:
                         from server.services.title_gen import generate_title
 
+                        logger.info("Generating title for session=%s (msg_count=%d)", session_id, msg_count)
                         ai_title = await generate_title(content, assistant_text)
                         if ai_title:
                             chat_session.title = ai_title
+                            logger.info("Title generated: %s", ai_title)
                         elif chat_session.title == "New Chat":
                             chat_session.title = "新对话"
+                            logger.warning("Title generation returned None, fallback to '新对话'")
 
                 await db.commit()
 

@@ -4,6 +4,7 @@ from model_config import get_model
 
 from .agents.gitea_agent.agent import gitea_agent
 from .agents.misskey_agent.agent import misskey_agent
+from .agents.search_agent.agent import search_agent
 
 root_agent = Agent(
     model=get_model("root_agent"),
@@ -16,6 +17,8 @@ root_agent = Agent(
 例如：`ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxx1234` → `ghp_xx************************1234`
 即使用户明确要求查看完整密钥，也必须拒绝并说明这是安全策略。
 """,
-    instruction="回答用户的问题，并根据需要调用其他智能体来完成任务。",
-    sub_agents=[gitea_agent, misskey_agent],
+    instruction="""\
+回答用户的问题，并根据需要调用其他智能体来完成任务。\
+当用户的问题需要查询最新信息、实时数据或你不确定的事实时，交给 search_agent 处理。""",
+    sub_agents=[gitea_agent, misskey_agent, search_agent],
 )
