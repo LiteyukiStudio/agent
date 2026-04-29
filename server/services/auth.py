@@ -392,11 +392,11 @@ async def resolve_api_token(db: AsyncSession, token: str) -> User | None:
         return None
 
     # 检查过期
-    if token_obj.expires_at and token_obj.expires_at < datetime.now(tz=UTC):
+    if token_obj.expires_at and token_obj.expires_at < datetime.now(tz=UTC).replace(tzinfo=None):
         return None
 
     # 更新最后使用时间
-    token_obj.last_used_at = datetime.now(tz=UTC)
+    token_obj.last_used_at = datetime.now(tz=UTC).replace(tzinfo=None)
     await db.commit()
 
     # 查找关联用户

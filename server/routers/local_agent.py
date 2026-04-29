@@ -193,7 +193,7 @@ async def local_agent_websocket(
         if dev:
             dev.device_name = device_name
             dev.token_id = token_id or dev.token_id
-            dev.last_seen_at = __import__("datetime").datetime.now(__import__("datetime").UTC)
+            dev.last_seen_at = __import__("datetime").datetime.utcnow()
         else:
             dev = Device(
                 user_id=user_id,
