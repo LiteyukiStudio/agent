@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from datetime import UTC, datetime, timedelta
 from typing import TYPE_CHECKING
 
@@ -15,6 +16,8 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from server.schemas.usage import QuotaPlanCreate, QuotaPlanUpdate
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -75,25 +78,46 @@ async def check_quota(db: AsyncSession, user: User) -> tuple[bool, str]:
         return (True, "")
 
     # 无配额方案 → 尝试加载默认方案
-    plan = await _get_user_plan(db, user)
+    try:
+        plan = await _get_user_plan(db, user)
+    except Exception:
+        logger.exception("check_quota: failed to load user plan for user=%s", user.id)
+        return (True, "")  # 查询失败时放行，不阻塞用户
+
     if plan is None:
         return (True, "")  # 无方案也无默认方案，放行
 
+    logger.info(
+        "check_quota: user=%s plan=%s (daily=%s, weekly=%s, monthly=%s)",
+        user.username,
+        plan.name,
+        plan.daily_tokens,
+        plan.weekly_tokens,
+        plan.monthly_tokens,
+    )
+
     # 检查各周期
-    if plan.daily_tokens is not None:
-        used = await _get_usage_since(db, user.id, _today_start())
-        if used >= plan.daily_tokens:
-            return (False, f"已达每日上限 {plan.daily_tokens} tokens")
+    try:
+        if plan.daily_tokens is not None:
+            used = await _get_usage_since(db, user.id, _today_start())
+            logger.info("check_quota: daily used=%d / limit=%d", used, plan.daily_tokens)
+            if used >= plan.daily_tokens:
+                return (False, f"已达每日上限 {plan.daily_tokens} tokens")
 
-    if plan.weekly_tokens is not None:
-        used = await _get_usage_since(db, user.id, _week_start())
-        if used >= plan.weekly_tokens:
-            return (False, f"已达每周上限 {plan.weekly_tokens} tokens")
+        if plan.weekly_tokens is not None:
+            used = await _get_usage_since(db, user.id, _week_start())
+            logger.info("check_quota: weekly used=%d / limit=%d", used, plan.weekly_tokens)
+            if used >= plan.weekly_tokens:
+                return (False, f"已达每周上限 {plan.weekly_tokens} tokens")
 
-    if plan.monthly_tokens is not None:
-        used = await _get_usage_since(db, user.id, _month_start())
-        if used >= plan.monthly_tokens:
-            return (False, f"已达每月上限 {plan.monthly_tokens} tokens")
+        if plan.monthly_tokens is not None:
+            used = await _get_usage_since(db, user.id, _month_start())
+            logger.info("check_quota: monthly used=%d / limit=%d", used, plan.monthly_tokens)
+            if used >= plan.monthly_tokens:
+                return (False, f"已达每月上限 {plan.monthly_tokens} tokens")
+    except Exception:
+        logger.exception("check_quota: usage query failed for user=%s", user.id)
+        return (True, "")  # 查询失败时放行
 
     return (True, "")
 

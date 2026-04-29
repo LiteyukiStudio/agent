@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
@@ -19,6 +20,19 @@ from server.services.usage import init_default_plan
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
+
+# ---------------------------------------------------------------------------
+# 日志配置：生产环境也输出 INFO 级别日志到 stdout
+# ---------------------------------------------------------------------------
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
+)
+# 降低第三方库的日志级别，避免刷屏
+logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("hpack").setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
 

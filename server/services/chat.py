@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -23,6 +24,8 @@ if TYPE_CHECKING:
     from sqlalchemy.ext.asyncio import AsyncSession
 
     from server.models.user import User
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # ADK Runner（延迟初始化的单例）
@@ -247,8 +250,11 @@ async def stream_response(
     # 前置配额检查
     allowed, reason = await check_quota(db, user)
     if not allowed:
+        logger.warning("stream_response: quota denied for user=%s reason=%s", user.username, reason)
         yield f"data: {json.dumps({'event': 'error', 'message': f'配额不足: {reason}'})}\n\n"
         return
+
+    logger.info("stream_response: user=%s session=%s quota OK, starting stream", user.username, adk_session_id)
 
     # 预加载用户配置到 ADK session state（确保工具读取到正确的用户凭据）
     session_service = get_session_service()
@@ -475,4 +481,5 @@ async def stream_response(
         yield f"data: {json.dumps(done_data)}\n\n"
 
     except Exception as e:
+        logger.exception("stream_response: unhandled error for user=%s session=%s", user.username, adk_session_id)
         yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
