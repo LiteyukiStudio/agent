@@ -298,10 +298,10 @@ async def init_default_plan(db: AsyncSession) -> None:
 
     plan = QuotaPlan(
         name="free",
-        daily_tokens=100_000,
-        weekly_tokens=500_000,
-        monthly_tokens=1_500_000,
-        requests_per_minute=10,
+        daily_tokens=1_000_000,
+        weekly_tokens=5_000_000,
+        monthly_tokens=15_000_000,
+        requests_per_minute=20,
         is_default=True,
     )
     db.add(plan)

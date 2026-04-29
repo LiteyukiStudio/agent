@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -38,6 +38,9 @@ export function QuotaPage() {
   const [plans, setPlans] = useState<QuotaPlan[]>([])
   const [form, setForm] = useState({ name: '', daily_tokens: '', weekly_tokens: '', monthly_tokens: '', requests_per_minute: '10' })
   const [dialogOpen, setDialogOpen] = useState(false)
+  const [editPlan, setEditPlan] = useState<QuotaPlan | null>(null)
+  const [editDialogOpen, setEditDialogOpen] = useState(false)
+  const [editForm, setEditForm] = useState({ name: '', daily_tokens: '', weekly_tokens: '', monthly_tokens: '', requests_per_minute: '' })
   const [deleteId, setDeleteId] = useState<string | null>(null)
 
   const load = useCallback(() => {
@@ -63,6 +66,39 @@ export function QuotaPage() {
     }
     catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to create plan')
+    }
+  }
+
+  function openEdit(plan: QuotaPlan) {
+    setEditPlan(plan)
+    setEditForm({
+      name: plan.name,
+      daily_tokens: plan.daily_tokens !== null ? String(plan.daily_tokens) : '',
+      weekly_tokens: plan.weekly_tokens !== null ? String(plan.weekly_tokens) : '',
+      monthly_tokens: plan.monthly_tokens !== null ? String(plan.monthly_tokens) : '',
+      requests_per_minute: String(plan.requests_per_minute),
+    })
+    setEditDialogOpen(true)
+  }
+
+  async function handleEdit() {
+    if (!editPlan)
+      return
+    try {
+      await apiPatch(`/api/v1/admin/quota-plans/${editPlan.id}`, {
+        name: editForm.name || undefined,
+        daily_tokens: editForm.daily_tokens ? Number(editForm.daily_tokens) : null,
+        weekly_tokens: editForm.weekly_tokens ? Number(editForm.weekly_tokens) : null,
+        monthly_tokens: editForm.monthly_tokens ? Number(editForm.monthly_tokens) : null,
+        requests_per_minute: editForm.requests_per_minute ? Number(editForm.requests_per_minute) : undefined,
+      })
+      setEditDialogOpen(false)
+      setEditPlan(null)
+      load()
+      toast.success('Plan updated')
+    }
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update plan')
     }
   }
 
@@ -134,7 +170,7 @@ export function QuotaPage() {
                 <TableHead>Monthly</TableHead>
                 <TableHead>RPM</TableHead>
                 <TableHead>Default</TableHead>
-                <TableHead className="w-32" />
+                <TableHead className="w-40" />
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -155,14 +191,23 @@ export function QuotaPage() {
                         )}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="text-destructive hover:text-destructive"
-                      onClick={() => setDeleteId(p.id)}
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => openEdit(p)}
+                      >
+                        <Pencil className="size-4" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive hover:text-destructive"
+                        onClick={() => setDeleteId(p.id)}
+                      >
+                        <Trash2 className="size-4" />
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}
@@ -177,6 +222,25 @@ export function QuotaPage() {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent>
+          <DialogTitle>Edit Quota Plan</DialogTitle>
+          <DialogDescription>Modify the plan limits. Leave empty for unlimited.</DialogDescription>
+          <div className="space-y-3 py-4">
+            <Input placeholder="Plan name" value={editForm.name} onChange={e => setEditForm(f => ({ ...f, name: e.target.value }))} />
+            <Input placeholder="Daily tokens (empty = unlimited)" type="number" value={editForm.daily_tokens} onChange={e => setEditForm(f => ({ ...f, daily_tokens: e.target.value }))} />
+            <Input placeholder="Weekly tokens" type="number" value={editForm.weekly_tokens} onChange={e => setEditForm(f => ({ ...f, weekly_tokens: e.target.value }))} />
+            <Input placeholder="Monthly tokens" type="number" value={editForm.monthly_tokens} onChange={e => setEditForm(f => ({ ...f, monthly_tokens: e.target.value }))} />
+            <Input placeholder="Requests per minute" type="number" value={editForm.requests_per_minute} onChange={e => setEditForm(f => ({ ...f, requests_per_minute: e.target.value }))} />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialogOpen(false)}>{tc('cancel')}</Button>
+            <Button onClick={handleEdit} disabled={!editForm.name}>{tc('save')}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <ConfirmDialog
         open={!!deleteId}

@@ -14,6 +14,13 @@ interface UserItem {
   username: string
   email: string | null
   role: string
+  quota_plan_id: string | null
+}
+
+interface QuotaPlan {
+  id: string
+  name: string
+  is_default: boolean
 }
 
 interface UsageStats {
@@ -36,15 +43,21 @@ export function UsersPage() {
   useTitle('Users')
   const [users, setUsers] = useState<UserItem[]>([])
   const [stats, setStats] = useState<UsageStats | null>(null)
+  const [plans, setPlans] = useState<QuotaPlan[]>([])
 
   const loadUsers = useCallback(() => {
     apiGet<UserItem[]>('/api/v1/admin/users').then(setUsers).catch(() => {})
   }, [])
 
+  const loadPlans = useCallback(() => {
+    apiGet<QuotaPlan[]>('/api/v1/admin/quota-plans').then(setPlans).catch(() => {})
+  }, [])
+
   useEffect(() => {
     loadUsers()
+    loadPlans()
     apiGet<UsageStats>('/api/v1/admin/usage/stats').then(setStats).catch(() => {})
-  }, [loadUsers])
+  }, [loadUsers, loadPlans])
 
   async function handleRoleChange(userId: string, role: string) {
     try {
@@ -55,6 +68,26 @@ export function UsersPage() {
     catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to update role')
     }
+  }
+
+  async function handleQuotaChange(userId: string, planId: string | null) {
+    try {
+      await apiPatch(`/api/v1/admin/users/${userId}/quota`, { quota_plan_id: planId })
+      loadUsers()
+      toast.success('Quota plan updated')
+    }
+    catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to update quota plan')
+    }
+  }
+
+  function getPlanName(planId: string | null): string {
+    if (!planId) {
+      const defaultPlan = plans.find(p => p.is_default)
+      return defaultPlan ? `${defaultPlan.name} (default)` : 'None'
+    }
+    const plan = plans.find(p => p.id === planId)
+    return plan ? plan.name : 'Unknown'
   }
 
   const isSuperuser = me?.role === 'superuser'
@@ -91,7 +124,8 @@ export function UsersPage() {
                 <TableHead>Username</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Role</TableHead>
-                <TableHead className="w-32">Actions</TableHead>
+                <TableHead>Quota Plan</TableHead>
+                <TableHead className="w-48">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -105,23 +139,46 @@ export function UsersPage() {
                     </Badge>
                   </TableCell>
                   <TableCell>
-                    {u.role !== 'superuser' && u.id !== me?.id && (
+                    <span className="text-sm text-muted-foreground">
+                      {getPlanName(u.quota_plan_id)}
+                    </span>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-1">
+                      {u.role !== 'superuser' && u.id !== me?.id && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger
+                            render={<Button variant="outline" size="sm">Role</Button>}
+                          />
+                          <DropdownMenuContent>
+                            <DropdownMenuItem onClick={() => handleRoleChange(u.id, 'user')}>
+                              User
+                            </DropdownMenuItem>
+                            {isSuperuser && (
+                              <DropdownMenuItem onClick={() => handleRoleChange(u.id, 'admin')}>
+                                Admin
+                              </DropdownMenuItem>
+                            )}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                       <DropdownMenu>
                         <DropdownMenuTrigger
-                          render={<Button variant="outline" size="sm">Change role</Button>}
+                          render={<Button variant="outline" size="sm">Quota</Button>}
                         />
                         <DropdownMenuContent>
-                          <DropdownMenuItem onClick={() => handleRoleChange(u.id, 'user')}>
-                            User
+                          <DropdownMenuItem onClick={() => handleQuotaChange(u.id, null)}>
+                            Use default
                           </DropdownMenuItem>
-                          {isSuperuser && (
-                            <DropdownMenuItem onClick={() => handleRoleChange(u.id, 'admin')}>
-                              Admin
+                          {plans.map(p => (
+                            <DropdownMenuItem key={p.id} onClick={() => handleQuotaChange(u.id, p.id)}>
+                              {p.name}
+                              {p.is_default && ' (default)'}
                             </DropdownMenuItem>
-                          )}
+                          ))}
                         </DropdownMenuContent>
                       </DropdownMenu>
-                    )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

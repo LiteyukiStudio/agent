@@ -23,6 +23,7 @@ class UserResponse(BaseModel):
     email: str | None = None
     avatar_url: str | None = None
     role: str
+    quota_plan_id: str | None = None
 
     model_config = {"from_attributes": True}
 
