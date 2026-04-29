@@ -20,7 +20,13 @@ import {
   type LoginResult,
 } from "./auth.js";
 import { getDeviceId } from "./config.js";
+import { checkUpdate } from "./update.js";
 import type { ToolRequest, ToolResponse } from "./tools.js";
+
+import { createRequire } from "node:module";
+const require = createRequire(import.meta.url);
+const pkg = require("../package.json") as { version: string };
+const VERSION = pkg.version;
 
 const DEFAULT_SERVER = "https://flow.liteyuki.org";
 
@@ -94,6 +100,14 @@ export function App() {
     } else {
       addLog("info", 'Type "/login" to authenticate, or "/help" for commands');
     }
+
+    // 启动时检查更新
+    checkUpdate(VERSION).then((update) => {
+      if (update) {
+        addLog("warn", `New version available: ${update.current} → ${update.latest}`);
+        addLog("warn", `Run: ${update.command}`);
+      }
+    });
   }, [addLog]);
 
   // Handle confirmation with y/n keys
