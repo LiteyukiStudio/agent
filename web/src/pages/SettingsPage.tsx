@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { useTranslation } from 'react-i18next'
-import { Copy, Key, Monitor, Plus, RefreshCw, Trash2 } from 'lucide-react'
+import { ArrowLeft, Copy, Key, Monitor, Plus, RefreshCw, Trash2 } from 'lucide-react'
 import { FaApple, FaWindows, FaLinux, FaUbuntu, FaFedora, FaSuse, FaCentos, FaRedhat } from 'react-icons/fa6'
 import { SiDebian, SiArchlinux, SiAlpinelinux, SiLinuxmint, SiManjaro } from 'react-icons/si'
 import { toast } from 'sonner'
@@ -63,6 +64,7 @@ function formatTokens(n: number): string {
 export function SettingsPage() {
   const { t } = useTranslation('settings')
   const { t: tc } = useTranslation('common')
+  const navigate = useNavigate()
   useTitle('Settings')
   const [tokens, setTokens] = useState<ApiToken[]>([])
   const [usage, setUsage] = useState<UsageStats | null>(null)
@@ -133,7 +135,18 @@ export function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 p-6">
-      <h1 className="text-2xl font-bold">{t('title')}</h1>
+      {/* 返回主页导航 */}
+      <div className="flex items-center gap-4">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="size-9 shrink-0"
+          onClick={() => navigate('/')}
+        >
+          <ArrowLeft className="size-5" />
+        </Button>
+        <h1 className="text-2xl font-bold">{t('title')}</h1>
+      </div>
 
       {/* Usage */}
       {usage && (
@@ -281,16 +294,13 @@ export function SettingsPage() {
             </Button>
           </div>
 
-          {tokens.length === 0 && (
+          {tokens.filter(tok => tok.scopes !== 'local-agent').length === 0 && (
             <p className="text-sm text-muted-foreground">{t('noTokens')}</p>
           )}
 
-          {tokens.map(tok => (
+          {tokens.filter(tok => tok.scopes !== 'local-agent').map(tok => (
             <div key={tok.id} className="flex items-center justify-between rounded-lg border p-3">
               <div className="flex items-center gap-2">
-                {tok.scopes === 'local-agent' && (
-                  <Monitor className="size-4 text-muted-foreground" />
-                )}
                 <div>
                   <p className="text-sm font-medium">{tok.name}</p>
                 <p className="text-xs text-muted-foreground">
