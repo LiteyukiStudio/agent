@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 from logging.config import fileConfig
+from typing import Any
 
 from sqlalchemy import pool
 
@@ -44,6 +45,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        include_object=_include_object,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -56,9 +58,28 @@ def run_migrations_online() -> None:
     connectable = create_engine(sync_url, poolclass=pool.NullPool)
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            include_object=_include_object,
+        )
         with context.begin_transaction():
             context.run_migrations()
+
+
+# ADK 内部表，autogenerate 时忽略
+_ADK_TABLES = {"sessions", "events", "app_states", "user_states", "adk_internal_metadata"}
+
+
+def _include_object(
+    object: Any,  # noqa: A002
+    name: str | None,
+    type_: str,
+    reflected: bool,
+    compare_to: Any,
+) -> bool:
+    """排除 ADK 自动创建的内部表。"""
+    return not (type_ == "table" and name in _ADK_TABLES)
 
 
 if context.is_offline_mode():
