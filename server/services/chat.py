@@ -295,6 +295,8 @@ async def stream_response(
     assistant_text = ""
     # 收集工具调用数据
     collected_tool_calls: list[dict] = []
+    # 跟踪哪些 sub_agent 已经产出过文本，用于去重 root_agent 的转发
+    seen_sub_agents: set[str] = set()
 
     try:
         async for event in runner.run_async(
@@ -327,27 +329,36 @@ async def stream_response(
                         )
 
             # 提取内容
-            # 只处理最终面向用户的 agent 输出，跳过 sub_agent 的中间转发
-            # ADK 在 agent transfer 场景下，sub_agent 的回复会被 root_agent 重新发出
-            # 导致同一段文本出现两次（author 不同）。只取非 root_agent 的原始输出。
+            # SSE 流式模式下，ADK 会为每个 agent 分别发送事件：
+            # 1. sub_agent 产出原始文本（author = sub_agent 名称）
+            # 2. root_agent 转发同样的文本（author = "root_agent"）
+            # 只保留 sub_agent 的原始输出，跳过 root_agent 的转发。
             if event.content and event.content.parts:
-                # 跳过 root_agent 转发的 sub_agent 内容（避免重复）
-                is_sub_agent_reply = bool(event.author and event.author != "root_agent")
+                author = event.author or "assistant"
+
+                # 记录产出过文本的 sub_agent
+                if author != "root_agent":
+                    seen_sub_agents.add(author)
 
                 for part in event.content.parts:
                     if part.text:
-                        # 如果是 root_agent 且之前已有 sub_agent 输出过相同内容，跳过
-                        if not is_sub_agent_reply and assistant_text and part.text in assistant_text:
+                        text = part.text
+
+                        # 如果有 sub_agent 已输出过内容，跳过 root_agent 的所有文本
+                        # （root_agent 在 transfer 场景下只是转发）
+                        if author == "root_agent" and seen_sub_agents:
+                            logger.debug("skip root_agent relay: %s...", text[:50])
                             continue
+
                         # 区分思考过程和正式回复
                         is_thinking = bool(part.thought)
                         if not is_thinking:
-                            assistant_text += part.text
+                            assistant_text += text
                         sse_data = json.dumps(
                             {
                                 "event": "thinking" if is_thinking else "text",
-                                "author": event.author or "assistant",
-                                "content": part.text,
+                                "author": author,
+                                "content": text,
                             }
                         )
                         yield f"data: {sse_data}\n\n"

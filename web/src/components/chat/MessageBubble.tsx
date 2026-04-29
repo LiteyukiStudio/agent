@@ -38,7 +38,7 @@ function ThinkingBlock({ content }: { content: string }) {
   )
 }
 
-const markdownClasses = 'prose prose-sm dark:prose-invert max-w-none [&_table]:text-xs [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_pre]:bg-background [&_pre]:text-xs [&_code]:text-xs [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_table]:my-2'
+const markdownClasses = 'prose prose-sm dark:prose-invert max-w-none break-words overflow-hidden [&_table]:text-xs [&_table]:w-full [&_table]:border-collapse [&_table]:block [&_table]:overflow-x-auto [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_pre]:bg-background [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:text-xs [&_code]:break-all [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_table]:my-2'
 
 // External links: primary color + icon + new tab; internal links: default
 function MarkdownLink({ href, children, ...props }: ComponentPropsWithoutRef<'a'>) {
@@ -68,7 +68,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const { user } = useAuth()
 
   return (
-    <div className={`flex gap-3 ${isUser ? 'flex-row-reverse' : ''}`}>
+    <div className={`flex gap-3 min-w-0 ${isUser ? 'flex-row-reverse' : ''}`}>
       <Avatar className="mt-0.5 size-8 shrink-0">
         {isUser && user?.avatar_url && <AvatarImage src={user.avatar_url} alt={user.username} />}
         <AvatarFallback className={isUser ? 'bg-primary text-primary-foreground' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300'}>
@@ -76,9 +76,9 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         </AvatarFallback>
       </Avatar>
 
-      <div className={`max-w-[75%] space-y-1 ${isUser ? 'text-right' : ''}`}>
+      <div className={`min-w-0 max-w-[75%] space-y-1 ${isUser ? 'text-right' : ''}`}>
         <div
-          className={`inline-block rounded-2xl px-4 py-2.5 text-sm leading-relaxed ${
+          className={`inline-block rounded-2xl px-4 py-2.5 text-sm leading-relaxed max-w-full overflow-hidden ${
             isUser
               ? 'bg-primary text-primary-foreground rounded-tr-md'
               : 'bg-muted rounded-tl-md'

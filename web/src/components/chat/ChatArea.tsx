@@ -90,7 +90,7 @@ export function ChatArea({ session, isLoading, onSend, onTogglePublic }: ChatAre
 
       {/* Messages */}
       <ScrollArea className="flex-1">
-        <div className="mx-auto max-w-3xl space-y-6 p-6">
+        <div className="mx-auto max-w-3xl space-y-6 overflow-hidden p-6">
           {session.messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <Bot className="mb-3 size-10" />
