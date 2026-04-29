@@ -24,10 +24,16 @@ const pkg = require("../package.json") as { version: string; name: string };
 
 const args = process.argv.slice(2);
 const command = args[0];
+const flags = new Set(args.slice(1));
+const yesMode = flags.has("-y") || flags.has("--yes") || args.includes("-y") || args.includes("--yes");
 
 switch (command) {
   case "-d":
   case "--daemon": {
+    if (yesMode) {
+      const { setAutoApprove } = await import("./connection.js");
+      setAutoApprove(true);
+    }
     const { runDaemon } = await import("./daemon.js");
     runDaemon();
     break;
@@ -82,18 +88,24 @@ switch (command) {
     printHelp();
     break;
 
+  case "-y":
+  case "--yes":
   case undefined:
   default:
-    if (command && !["", undefined].includes(command) && command.startsWith("-")) {
+    if (command && !["", undefined, "-y", "--yes"].includes(command) && command.startsWith("-")) {
       console.error(`Unknown option: ${command}`);
       printHelp();
       process.exit(1);
     }
     // 交互式 TUI 模式
-    if (command && command !== "") {
+    if (command && command !== "" && command !== "-y" && command !== "--yes") {
       console.error(`Unknown command: ${command}`);
       printHelp();
       process.exit(1);
+    }
+    if (yesMode) {
+      const { setAutoApprove } = await import("./connection.js");
+      setAutoApprove(true);
     }
     const React = await import("react");
     const { render } = await import("ink");
@@ -106,7 +118,7 @@ function printHelp(): void {
   console.log(`
 Liteyuki Local Agent v${pkg.version}
 
-Usage: liteyuki-agent [command]
+Usage: liteyuki-agent [command] [flags]
 
 Commands:
   (none)          Start interactive TUI mode
@@ -119,9 +131,14 @@ Commands:
   version, -v     Show version number
   help, -h        Show this help
 
+Flags:
+  -y, --yes       Auto-approve all commands (skip confirmation for dangerous ops)
+
 Examples:
   liteyuki-agent              # Interactive login & connect
   liteyuki-agent -d           # Background mode (after login)
+  liteyuki-agent -d -y        # Background + auto-approve all commands
+  liteyuki-agent -y           # Interactive + auto-approve
   liteyuki-agent install      # Auto-start on boot
   liteyuki-agent info         # Check device ID and config
 `);

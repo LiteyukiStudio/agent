@@ -29,6 +29,11 @@ let shouldReconnect = false;
 let currentUrl = "";
 let currentToken = "";
 let events: ConnectionEvents | null = null;
+let autoApprove = false;
+
+export function setAutoApprove(value: boolean): void {
+  autoApprove = value;
+}
 
 export function setEvents(e: ConnectionEvents): void {
   events = e;
@@ -123,8 +128,9 @@ function scheduleReconnect(): void {
 }
 
 function handleRequest(request: ToolRequest): void {
-  // Check if dangerous
+  // Check if dangerous — skip confirmation if autoApprove is on
   if (
+    !autoApprove &&
     request.tool === "run_command" &&
     typeof request.args.command === "string" &&
     isDangerous(request.args.command)

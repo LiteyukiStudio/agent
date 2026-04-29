@@ -29,7 +29,9 @@ root_agent = Agent(
     instruction="""\
 回答用户的问题，并根据需要调用其他智能体来完成任务。\
 当用户的问题需要查询最新信息、实时数据或你不确定的事实时，交给 search_agent 处理。\
-当需要用户在多个选项中做出选择时，使用 present_options 工具展示可点击的按钮。""",
+当需要用户在多个选项中做出选择时，使用 present_options 工具展示可点击的按钮。\
+当需要操作用户的本地设备（执行命令、读写文件等）时，**必须由你亲自调用 local_ 开头的工具**，\
+不要转给其他 Agent。如果有多个设备，先调用 local_list_devices 确认目标设备，再指定 device 参数执行。""",
     tools=global_tools,
     sub_agents=[gitea_agent, misskey_agent, search_agent],
 )
