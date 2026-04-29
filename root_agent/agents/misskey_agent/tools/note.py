@@ -85,11 +85,14 @@ def search_notes(
         offset: Offset for pagination
     """
     with MisskeyClient.from_context(tool_context) as c:
-        return c.request("/notes/search", {
-            "query": query,
-            "limit": limit,
-            "offset": offset,
-        })
+        return c.request(
+            "/notes/search",
+            {
+                "query": query,
+                "limit": limit,
+                "offset": offset,
+            },
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -279,10 +282,13 @@ def translate_note(note_id: str, target_lang: str, tool_context: ToolContext) ->
         target_lang: Target language code, e.g. "zh-CN", "en", "ja"
     """
     with MisskeyClient.from_context(tool_context) as c:
-        return c.request("/notes/translate", {
-            "noteId": note_id,
-            "targetLang": target_lang,
-        })
+        return c.request(
+            "/notes/translate",
+            {
+                "noteId": note_id,
+                "targetLang": target_lang,
+            },
+        )
 
 
 all_tools: list = [

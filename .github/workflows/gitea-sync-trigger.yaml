@@ -1,0 +1,24 @@
+name: Gitea Sync Trigger
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  GITEA_URL: https://git.liteyuki.org
+  GITEA_OWNER: liteyuki-docker
+  GITEA_REPO: adk-demo
+
+jobs:
+  gitea-trigger:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Gitea Mirror Sync
+        run: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: token ${{ secrets.GITEA_TOKEN }}" \
+            "${{ env.GITEA_URL }}/api/v1/repos/${{ env.GITEA_OWNER }}/${{ env.GITEA_REPO }}/mirror-sync" \
+            -d '{"branch": "main"}'

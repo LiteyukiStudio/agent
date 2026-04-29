@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
@@ -11,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 import server.models  # noqa: F401 — 确保所有模型被注册
 from server.config import settings
-from server.database import async_session_factory, create_all_tables
+from server.database import async_session_factory
 from server.routers import admin, auth, chat, usage, user_config
 from server.services.auth import init_superuser
 from server.services.usage import init_default_plan
@@ -19,11 +20,32 @@ from server.services.usage import init_default_plan
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
+logger = logging.getLogger(__name__)
+
+
+def _run_alembic_upgrade() -> None:
+    """同步执行 Alembic 数据库迁移到最新版本。"""
+    from pathlib import Path
+
+    from alembic import command
+    from alembic.config import Config
+
+    # 确保 SQLite data 目录存在
+    db_url = settings.database_url
+    if "sqlite" in db_url:
+        db_path = db_url.split("///")[-1]
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
+
+    alembic_cfg = Config("alembic.ini")
+    command.upgrade(alembic_cfg, "head")
+    logger.info("Database migration completed (alembic upgrade head)")
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None]:
-    """应用生命周期：启动时创建数据库表并初始化超级用户。"""
-    await create_all_tables()
+    """应用生命周期：启动时执行数据库迁移并初始化超级用户。"""
+    # 自动迁移数据库到最新 schema
+    _run_alembic_upgrade()
     # 首次启动自动创建初始超级用户和默认配额方案
     async with async_session_factory() as db:
         await init_superuser(db)

@@ -24,7 +24,7 @@ class Settings:
     """从环境变量解析的服务器配置。"""
 
     database_url: str = field(
-        default_factory=lambda: os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data.db"),
+        default_factory=lambda: os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./data/data.db"),
     )
     secret_key: str = field(
         default_factory=lambda: os.getenv("SECRET_KEY", "change-me-to-a-random-string"),

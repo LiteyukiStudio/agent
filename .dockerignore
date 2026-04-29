@@ -5,6 +5,7 @@ __pycache__
 .ruff_cache
 .adk
 .credentials.json
+data/
 data.db
 *.db-journal
 node_modules

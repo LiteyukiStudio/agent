@@ -13,7 +13,8 @@ COPY pyproject.toml uv.lock README.md ./
 RUN uv sync --no-install-project --frozen
 
 # 复制项目代码
-COPY model_config.py credential_provider.py ./
+COPY model_config.py credential_provider.py alembic.ini ./
+COPY alembic/ ./alembic/
 COPY root_agent/ ./root_agent/
 COPY server/ ./server/
 

@@ -60,12 +60,15 @@ def search_users(
         origin: "local", "remote", or "combined"
     """
     with MisskeyClient.from_context(tool_context) as c:
-        return c.request("/users/search", {
-            "query": query,
-            "limit": limit,
-            "offset": offset,
-            "origin": origin,
-        })
+        return c.request(
+            "/users/search",
+            {
+                "query": query,
+                "limit": limit,
+                "offset": offset,
+                "origin": origin,
+            },
+        )
 
 
 # ---------------------------------------------------------------------------

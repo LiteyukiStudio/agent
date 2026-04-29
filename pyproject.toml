@@ -16,10 +16,12 @@ dependencies = [
     "authlib>=1.5",
     "python-jose[cryptography]>=3.3",
     "bcrypt>=4.2",
+    "alembic>=1.18.4",
 ]
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.6.0",
     "ruff>=0.11",
 ]
 

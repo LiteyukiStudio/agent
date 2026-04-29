@@ -2,6 +2,55 @@
 
 本文档是项目的编码约定，面向开发者和 AI 编码助手。只列常用规则，细节由 Ruff / ESLint 自动检查。
 
+## 开发环境设置
+
+### 安装依赖
+
+```bash
+# 后端
+uv sync
+
+# 前端
+cd web && pnpm install
+```
+
+### Pre-commit Hooks
+
+项目使用 pre-commit 在提交前自动检查代码质量。**首次 clone 后必须安装**：
+
+```bash
+uv run pre-commit install
+```
+
+每次 `git commit` 时会自动运行：
+- **ruff**：Python lint + 自动修复
+- **ruff format**：Python 代码格式化
+- **ESLint**：前端 TypeScript lint
+- **tsc --noEmit**：前端类型检查
+
+手动全量检查：
+
+```bash
+uv run pre-commit run --all-files
+```
+
+### 数据库迁移（Alembic）
+
+项目使用 Alembic 管理数据库 schema 变更，**不需要手动 `ALTER TABLE` 或删库重建**。
+
+```bash
+# 改了 ORM 模型后，生成迁移脚本
+uv run alembic revision --autogenerate -m "add xxx column"
+
+# 手动执行迁移（通常不需要，应用启动时自动执行）
+uv run alembic upgrade head
+
+# 查看当前数据库版本
+uv run alembic current
+```
+
+应用启动时会自动执行 `alembic upgrade head`，无需手动操作。
+
 ## 通用
 
 - 缩进：Python 4 空格，TypeScript 2 空格

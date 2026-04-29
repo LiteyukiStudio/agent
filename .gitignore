@@ -24,5 +24,6 @@ wheels/
 .credentials.json
 
 # Database
+data/
 data.db
 *.db-journal

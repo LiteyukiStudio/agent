@@ -15,10 +15,13 @@ def create_reaction(note_id: str, reaction: str, tool_context: ToolContext) -> d
         reaction: The reaction emoji, e.g. "👍", "❤️", or custom emoji like ":misskey:"
     """
     with MisskeyClient.from_context(tool_context) as c:
-        return c.request("/notes/reactions/create", {
-            "noteId": note_id,
-            "reaction": reaction,
-        })
+        return c.request(
+            "/notes/reactions/create",
+            {
+                "noteId": note_id,
+                "reaction": reaction,
+            },
+        )
 
 
 def delete_reaction(note_id: str, tool_context: ToolContext) -> dict:

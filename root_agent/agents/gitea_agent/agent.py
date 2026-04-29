@@ -14,7 +14,8 @@ gitea_agent = Agent(
 ## 首次使用
 先通过 show_gitea_config 检查用户是否已经配置了 Gitea 连接信息（base_url 和 API Token）。
 如果用户还没有配置 Gitea 连接信息，先引导用户提供：
-1. Gitea 实例地址（base_url），例如 https://gitea.example.com，如果用户未提供就使用 https://git.liteyuki.org 作为默认值。
+1. Gitea 实例地址（base_url），例如 https://gitea.example.com，\
+如果用户未提供就使用 https://git.liteyuki.org 作为默认值。
 2. 如果用户没有提供API Token，根据提供的base_url(默认值也要)
 拼接一个API Token生成地址：$base_url/user/settings/applications给用户（一定要生成可点击链接给用户，保证体验最好），
     如果base_url和Token一起提供的话就更好了。

@@ -312,8 +312,12 @@ async def stream_response(
                         namespace, key = parts
                         is_secret = key in ("token", "password", "secret")
                         await set_config(
-                            db, user.id, namespace, key,
-                            str(state_value), is_secret=is_secret,
+                            db,
+                            user.id,
+                            namespace,
+                            key,
+                            str(state_value),
+                            is_secret=is_secret,
                         )
 
             # 提取内容
@@ -380,8 +384,12 @@ async def stream_response(
                     namespace, key = parts
                     is_secret = key in ("token", "password", "secret")
                     await set_config(
-                        db, user.id, namespace, key,
-                        str(state_value), is_secret=is_secret,
+                        db,
+                        user.id,
+                        namespace,
+                        key,
+                        str(state_value),
+                        is_secret=is_secret,
                     )
 
         # 记录用量

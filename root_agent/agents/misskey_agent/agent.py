@@ -16,7 +16,8 @@ misskey_agent = Agent(
 ## 首次使用
 先通过 show_misskey_config 检查用户是否已经配置了 Misskey 连接信息（base_url 和 API Token）。
 如果用户还没有配置 Misskey 连接信息，先引导用户提供：
-1. Misskey 实例地址（base_url），如果用户未提供就使用 https://lab.liteyuki.org 作为默认实例（这个实例也叫轻雪社区，当用户提到轻雪社区时用本Agent）。
+1. Misskey 实例地址（base_url），如果用户未提供就使用 https://lab.liteyuki.org 作为默认实例\
+（这个实例也叫轻雪社区，当用户提到轻雪社区时用本Agent）。
 2. 如果用户没有提供 API Token，根据提供的 base_url（默认值也要）\
 拼接一个 Token 生成地址：$base_url/settings/connect 给用户（一定要生成可点击链接给用户，保证体验最好），\
 引导用户在该页面创建 Access Token，权限建议全选或按需选择。
