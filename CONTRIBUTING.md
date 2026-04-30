@@ -219,6 +219,22 @@ uv run pre-commit run --all-files
   - `X | Y` 不用 `typing.Union[X, Y]`
   - `X | None` 不用 `typing.Optional[X]`
 - 使用 `from __future__ import annotations` 开启延迟求值（文件顶部）
+- **类型注解与运行时导入**：当类型仅用于注解而不在运行时使用时，使用字符串字面量形式（forward reference）而非 `TYPE_CHECKING` 导入：
+  ```python
+  # ✅ 正确：字符串字面量（不需要运行时导入）
+  def process(data: "DataFrame") -> "Series": ...
+
+  # ✅ 正确：运行时确实需要该类型（如框架反射解析签名）则正常导入
+  from google.adk.tools import ToolContext
+  def my_tool(tool_context: ToolContext) -> str: ...
+
+  # ❌ 错误：TYPE_CHECKING + 裸注解（ADK 等框架运行时 eval 注解会报 NameError）
+  from typing import TYPE_CHECKING
+  if TYPE_CHECKING:
+      from google.adk.tools import ToolContext
+  def my_tool(tool_context: ToolContext) -> str: ...  # 运行时爆炸
+  ```
+  **规则**：如果框架在运行时需要解析函数签名（如 ADK 工具注册、FastAPI 依赖注入、Pydantic 模型），类型必须运行时可用——正常导入即可。仅在纯静态分析场景（不被框架反射的内部函数）才考虑 forward reference。
 - 优先 `pathlib.Path` 而非 `os.path`
 - 禁止遗留 `print()`（tools 目录除外，调试用）
 - import 顺序：stdlib → 第三方 → 本项目（isort 自动处理）

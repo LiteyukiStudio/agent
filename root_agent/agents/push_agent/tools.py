@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import json
-from typing import TYPE_CHECKING
+
+from google.adk.tools import ToolContext
 
 from .adapters import PushAdapter, get_adapter_class, list_adapter_types
-
-if TYPE_CHECKING:
-    from google.adk.tools import ToolContext
 
 
 def _get_channels(tool_context: ToolContext) -> dict:

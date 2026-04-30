@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from google.adk.tools import ToolContext
+from google.adk.tools import ToolContext
 
 
 async def get_current_user_info(tool_context: ToolContext) -> str:
