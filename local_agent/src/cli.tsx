@@ -281,6 +281,19 @@ function startService(): void {
       console.log(t.service.alreadyRunning);
     }
   } else if (os === "linux") {
+    // 检查 systemd user session 是否可用
+    try {
+      execSync("systemctl --user status >/dev/null 2>&1", { stdio: "pipe" });
+    } catch {
+      console.error("systemd user session 不可用。");
+      console.error("可能原因: 以 root 运行 / Docker 容器 / SSH 无 lingering");
+      console.error("");
+      console.error("解决方案（任选一）:");
+      console.error("  1. 以普通用户运行: su - <user> -c 'liteyuki-agent start'");
+      console.error("  2. 启用 lingering: loginctl enable-linger <user>");
+      console.error("  3. 直接用 daemon 模式: liteyuki-agent -d");
+      return;
+    }
     try {
       execSync("systemctl --user start liteyuki-local-agent");
       console.log(t.service.started);
