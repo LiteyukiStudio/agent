@@ -22,12 +22,13 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
 # ---------------------------------------------------------------------------
-# 日志配置：生产环境也输出 INFO 级别日志到 stdout
+# 日志配置：确保应用日志输出到 stdout，即使在 uvicorn --reload 模式下
 # ---------------------------------------------------------------------------
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
     stream=sys.stdout,
+    force=True,  # 强制覆盖 uvicorn 预设的 handler
 )
 # 降低第三方库的日志级别，避免刷屏
 logging.getLogger("httpcore").setLevel(logging.WARNING)
@@ -105,4 +106,11 @@ async def health() -> dict[str, str]:
 def cli() -> None:
     """`uv run server` 的 CLI 入口点。"""
     # 开发环境仍用 uvicorn（支持 reload），生产用 hypercorn
-    uvicorn.run("server.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(
+        "server.main:app",
+        host="0.0.0.0",
+        port=8000,
+        reload=True,
+        reload_includes=["*.env"],
+        log_level="info",
+    )
