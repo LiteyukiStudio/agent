@@ -295,6 +295,18 @@ async def stream_response(
     assistant_text = ""
     # 收集工具调用数据
     collected_tool_calls: list[dict] = []
+
+    # 预创建助手消息（流开始前就写入数据库，中途刷新不丢失）
+    assistant_msg: Message | None = None
+    if session_id:
+        assistant_msg = Message(
+            session_id=session_id,
+            role="assistant",
+            content="",
+        )
+        db.add(assistant_msg)
+        await db.commit()
+        await db.refresh(assistant_msg)
     # 去重：SSE 流式模式下 ADK 先发 partial=True 的逐 token 事件，
     # 最后发 partial=False/None 的完整文本事件，导致内容重复。
     # 只输出 partial 事件（流式 token），跳过最终的完整事件。
@@ -489,10 +501,16 @@ async def stream_response(
                 session_id=session_id,
             )
 
-        # 保存助手消息
-        if session_id and assistant_text:
+        # 更新助手消息内容（流结束时最终写入）
+        if assistant_msg and (assistant_text or collected_tool_calls):
             tool_calls_json = json.dumps(collected_tool_calls) if collected_tool_calls else None
-            await save_message(db, session_id, "assistant", assistant_text, tool_calls_json)
+            assistant_msg.content = assistant_text
+            assistant_msg.tool_calls = tool_calls_json
+            await db.commit()
+        elif assistant_msg and not assistant_text and not collected_tool_calls:
+            # 没有任何输出，删除预创建的空消息
+            await db.delete(assistant_msg)
+            await db.commit()
 
         # 更新会话的最近消息摘要 + 自动标题
         if session_id:
@@ -556,3 +574,12 @@ async def stream_response(
     except Exception as e:
         logger.exception("stream_response: unhandled error for user=%s session=%s", user.username, adk_session_id)
         yield f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n"
+        # 异常时更新预创建的助手消息（保留已累积的内容）
+        if assistant_msg:
+            try:
+                tool_calls_json = json.dumps(collected_tool_calls) if collected_tool_calls else None
+                assistant_msg.content = assistant_text or "(生成中断)"
+                assistant_msg.tool_calls = tool_calls_json
+                await db.commit()
+            except Exception:
+                logger.warning("Failed to update assistant message after error")
