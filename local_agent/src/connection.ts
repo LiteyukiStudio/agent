@@ -155,8 +155,8 @@ const pendingConfirms: Map<string, {
   timer: ReturnType<typeof setTimeout>;
 }> = new Map();
 
-// 本次会话中被「始终允许」的命令（连接断开后清空）
-const sessionAllowedCommands: Set<string> = new Set();
+// 本次会话是否已启用「始终允许」模式（连接断开后重置）
+let sessionAlwaysApprove = false;
 
 // 本次会话缓存的 sudo 密码（连接断开后清空，绝不写盘）
 let cachedSudoPassword: string | null = null;
@@ -208,39 +208,37 @@ async function handleRequest(request: ToolRequest): Promise<void> {
   const command = typeof request.args.command === "string" ? request.args.command : "";
   const isSudoCommand = request.tool === "run_command" && needsSudo(command);
 
-  // Check if dangerous — skip confirmation if autoApprove is on
+  // Check if dangerous — skip confirmation if autoApprove or sessionAlwaysApprove is on
   if (
     !autoApprove &&
+    !sessionAlwaysApprove &&
     request.tool === "run_command" &&
     isDangerous(command)
   ) {
-    // 检查是否在本次会话中已被「始终允许」
-    if (!sessionAllowedCommands.has(command)) {
-      // sudo 命令：如果没有缓存密码则需要密码
-      const requirePassword = isSudoCommand && !cachedSudoPassword;
+    // sudo 命令：如果没有缓存密码则需要密码
+    const requirePassword = isSudoCommand && !cachedSudoPassword;
 
-      // 通过 Web 前端请求审批
-      const result = await requestWebConfirmation(request, requirePassword);
-      if (result.action === "always") {
-        sessionAllowedCommands.add(command);
-        // 如果用户提供了密码且勾选记住，缓存密码
-        if (result.password) {
-          cachedSudoPassword = result.password;
-        }
-      } else if (result.action === "approve") {
-        // 一次性使用密码
-        if (result.password && !cachedSudoPassword) {
-          cachedSudoPassword = result.password;
-        }
-      } else {
-        const response: ToolResponse = {
-          id: request.id,
-          error: t.confirm.rejected,
-        };
-        sendResponse(response);
-        events?.onResponse(response);
-        return;
+    // 通过 Web 前端请求审批
+    const result = await requestWebConfirmation(request, requirePassword);
+    if (result.action === "always") {
+      // 「始终允许」：本次会话后续所有命令都跳过确认
+      sessionAlwaysApprove = true;
+      if (result.password) {
+        cachedSudoPassword = result.password;
       }
+    } else if (result.action === "approve") {
+      // 一次性使用密码
+      if (result.password && !cachedSudoPassword) {
+        cachedSudoPassword = result.password;
+      }
+    } else {
+      const response: ToolResponse = {
+        id: request.id,
+        error: t.confirm.rejected,
+      };
+      sendResponse(response);
+      events?.onResponse(response);
+      return;
     }
   }
 
