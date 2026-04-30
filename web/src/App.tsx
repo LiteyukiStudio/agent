@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { Toaster } from 'sonner'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
 import { AdminLayout } from '@/pages/admin/AdminLayout'
+import { AdminUserSessionsPage } from '@/pages/admin/AdminUserSessionsPage'
 import { OAuthPage } from '@/pages/admin/OAuthPage'
 import { QuotaPage } from '@/pages/admin/QuotaPage'
 import { UsersPage } from '@/pages/admin/UsersPage'
@@ -63,6 +64,8 @@ export default function App() {
         >
           <Route index element={<Navigate to="/admin/users" replace />} />
           <Route path="users" element={<UsersPage />} />
+          <Route path="users/:userId/sessions" element={<AdminUserSessionsPage />} />
+          <Route path="users/:userId/sessions/:sessionId" element={<AdminUserSessionsPage />} />
           <Route path="oauth" element={<OAuthPage />} />
           <Route path="quota" element={<QuotaPage />} />
         </Route>

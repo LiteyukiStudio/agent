@@ -17,6 +17,7 @@ import { platform, homedir, arch, release } from "node:os";
 import { existsSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
+import { t } from "./i18n/index.js";
 
 import { createRequire } from "node:module";
 const require = createRequire(import.meta.url);
@@ -63,6 +64,10 @@ switch (command) {
     showStatus();
     break;
 
+  case "sudoers":
+    setupSudoers();
+    break;
+
   case "version":
   case "-v":
   case "--version":
@@ -72,25 +77,25 @@ switch (command) {
   case "info": {
     const { getDeviceId } = await import("./config.js");
     const { getDeviceName, getOsType } = await import("./auth.js");
-    console.log(`Liteyuki Local Agent v${pkg.version}`);
+    console.log(`${t.cli.help.title} v${pkg.version}`);
     console.log(`──────────────────────────────`);
-    console.log(`Device Name: ${getDeviceName()}`);
-    console.log(`Device ID:   ${getDeviceId()}`);
-    console.log(`OS Type:     ${getOsType()}`);
-    console.log(`Platform:    ${platform()} ${arch()}`);
-    console.log(`Kernel:      ${release()}`);
+    console.log(`${t.info.deviceName} ${getDeviceName()}`);
+    console.log(`${t.info.deviceId}   ${getDeviceId()}`);
+    console.log(`${t.info.osType}     ${getOsType()}`);
+    console.log(`${t.info.platform}    ${platform()} ${arch()}`);
+    console.log(`${t.info.kernel}      ${release()}`);
     const { getConfig, getConfigPath } = await import("./config.js");
     const cfg = getConfig();
-    console.log(`Server:      ${cfg.baseUrl || "(not configured)"}`);
-    console.log(`Token:       ${cfg.token ? cfg.token.slice(0, 8) + "..." : "(not set)"}`);
-    console.log(`Config:      ${getConfigPath()}`);
+    console.log(`${t.info.server}      ${cfg.baseUrl || t.info.notConfigured}`);
+    console.log(`${t.info.token}       ${cfg.token ? cfg.token.slice(0, 8) + "..." : t.info.notSet}`);
+    console.log(`${t.info.config}      ${getConfigPath()}`);
     break;
   }
 
   case "logout": {
     const { clearConnection } = await import("./config.js");
     clearConnection();
-    console.log("✅ Credentials cleared. Run `liteyuki-agent` to login again.");
+    console.log(t.cli.credentialsCleared);
     break;
   }
 
@@ -127,36 +132,38 @@ switch (command) {
 }
 
 function printHelp(): void {
+  const h = t.cli.help;
   console.log(`
-Liteyuki Local Agent v${pkg.version}
+${h.title} v${pkg.version}
 
-Usage: liteyuki-agent [command] [flags]
+${h.usage}
 
-Commands:
-  (none)          Start interactive TUI mode
-  -d, --daemon    Run in headless daemon mode
-  install         Install as system service (auto-start on boot)
-  uninstall       Remove system service
-  start           Start the background service
-  stop            Stop the background service
-  restart         Restart the background service (useful after update)
-  status          Show service status
-  info            Show device info and config
-  logout          Clear saved credentials
-  version, -v     Show version number
-  help, -h        Show this help
+${h.commands}
+  ${h.cmdNone}
+  ${h.cmdDaemon}
+  ${h.cmdInstall}
+  ${h.cmdUninstall}
+  ${h.cmdStart}
+  ${h.cmdStop}
+  ${h.cmdRestart}
+  ${h.cmdStatus}
+  ${h.cmdSudoers}
+  ${h.cmdInfo}
+  ${h.cmdLogout}
+  ${h.cmdVersion}
+  ${h.cmdHelp}
 
-Flags:
-  -y, --yes       Auto-approve all commands (skip confirmation for dangerous ops)
+${h.flags}
+  ${h.flagYes}
 
-Examples:
-  liteyuki-agent              # Interactive login & connect
-  liteyuki-agent -d           # Background mode (after login)
-  liteyuki-agent -d -y        # Background + auto-approve all commands
-  liteyuki-agent install      # Auto-start on boot
-  liteyuki-agent restart      # Restart after update
-  liteyuki-agent stop         # Stop background service
-  liteyuki-agent info         # Check device ID and config
+${h.examples}
+  ${h.exInteractive}
+  ${h.exDaemon}
+  ${h.exDaemonYes}
+  ${h.exInstall}
+  ${h.exRestart}
+  ${h.exStop}
+  ${h.exInfo}
 `);
 }
 
@@ -173,25 +180,25 @@ function showStatus(): void {
   if (os === "darwin") {
     const plistPath = getLaunchdPlistPath();
     if (!existsSync(plistPath)) {
-      console.log("Service not installed. Run `liteyuki-agent install` to set up.");
+      console.log(t.service.notInstalledHint);
       return;
     }
-    console.log("Service: installed (macOS launchd)");
+    console.log(`${t.service.installed} (macOS launchd)`);
     console.log(`Plist:   ${plistPath}`);
     try {
       const output = execSync(`launchctl list | grep ${LAUNCHD_LABEL}`, { encoding: "utf-8" });
-      console.log(`Status:  running`);
+      console.log(t.service.running);
       console.log(`         ${output.trim()}`);
     } catch {
-      console.log(`Status:  not running`);
+      console.log(t.service.notRunning);
     }
   } else if (os === "linux") {
     const servicePath = getSystemdServicePath();
     if (!existsSync(servicePath)) {
-      console.log("Service not installed. Run `liteyuki-agent install` to set up.");
+      console.log(t.service.notInstalledHint);
       return;
     }
-    console.log("Service: installed (systemd user)");
+    console.log(`${t.service.installed} (systemd user)`);
     console.log(`Unit:    ${servicePath}`);
     try {
       const output = execSync("systemctl --user is-active liteyuki-local-agent", { encoding: "utf-8" }).trim();
@@ -233,24 +240,24 @@ function stopService(): void {
   if (os === "darwin") {
     const plistPath = getLaunchdPlistPath();
     if (!existsSync(plistPath)) {
-      console.log("Service not installed. Run `liteyuki-agent install` first.");
+      console.log(t.service.notInstalled);
       return;
     }
     try {
       execSync(`launchctl unload ${plistPath}`);
-      console.log("✅ Service stopped");
+      console.log(t.service.stopped);
     } catch {
-      console.log("Service is not running.");
+      console.log(t.service.notRunning);
     }
   } else if (os === "linux") {
     try {
       execSync("systemctl --user stop liteyuki-local-agent");
-      console.log("✅ Service stopped");
+      console.log(t.service.stopped);
     } catch {
-      console.log("Service is not running.");
+      console.log(t.service.notRunning);
     }
   } else {
-    console.error(`Unsupported platform: ${os}`);
+    console.error(`${t.service.unsupportedPlatform} ${os}`);
   }
 }
 
@@ -259,24 +266,24 @@ function startService(): void {
   if (os === "darwin") {
     const plistPath = getLaunchdPlistPath();
     if (!existsSync(plistPath)) {
-      console.log("Service not installed. Run `liteyuki-agent install` first.");
+      console.log(t.service.notInstalled);
       return;
     }
     try {
       execSync(`launchctl load ${plistPath}`);
-      console.log("✅ Service started");
+      console.log(t.service.started);
     } catch {
-      console.log("Service may already be running. Use `liteyuki-agent status` to check.");
+      console.log(t.service.alreadyRunning);
     }
   } else if (os === "linux") {
     try {
       execSync("systemctl --user start liteyuki-local-agent");
-      console.log("✅ Service started");
+      console.log(t.service.started);
     } catch (e) {
-      console.error("Failed to start service:", e);
+      console.error(t.service.failedStart, e);
     }
   } else {
-    console.error(`Unsupported platform: ${os}`);
+    console.error(`${t.service.unsupportedPlatform} ${os}`);
   }
 }
 
@@ -285,7 +292,7 @@ function restartService(): void {
   if (os === "darwin") {
     const plistPath = getLaunchdPlistPath();
     if (!existsSync(plistPath)) {
-      console.log("Service not installed. Run `liteyuki-agent install` first.");
+      console.log(t.service.notInstalled);
       return;
     }
     try {
@@ -295,19 +302,19 @@ function restartService(): void {
     }
     try {
       execSync(`launchctl load ${plistPath}`);
-      console.log("✅ Service restarted");
+      console.log(t.service.restarted);
     } catch (e) {
-      console.error("Failed to restart service:", e);
+      console.error(t.service.failedRestart, e);
     }
   } else if (os === "linux") {
     try {
       execSync("systemctl --user restart liteyuki-local-agent");
-      console.log("✅ Service restarted");
+      console.log(t.service.restarted);
     } catch (e) {
-      console.error("Failed to restart service:", e);
+      console.error(t.service.failedRestart, e);
     }
   } else {
-    console.error(`Unsupported platform: ${os}`);
+    console.error(`${t.service.unsupportedPlatform} ${os}`);
   }
 }
 
@@ -357,19 +364,19 @@ function installLaunchd(): void {
 
   try {
     execSync(`launchctl load ${plistPath}`);
-    console.log("✅ Service installed and started (macOS launchd)");
+    console.log(`${t.service.installSuccess} (macOS launchd)`);
     console.log(`   Plist: ${plistPath}`);
     console.log(`   Logs:  ${logDir}/`);
     console.log(`   Stop:  launchctl unload ${plistPath}`);
   } catch (e) {
-    console.error("Failed to load service:", e);
+    console.error(t.service.failedStart, e);
   }
 }
 
 function uninstallLaunchd(): void {
   const plistPath = getLaunchdPlistPath();
   if (!existsSync(plistPath)) {
-    console.log("Service not installed.");
+    console.log(t.service.notInstalledHint);
     return;
   }
   try {
@@ -378,7 +385,7 @@ function uninstallLaunchd(): void {
     // May already be unloaded
   }
   unlinkSync(plistPath);
-  console.log("✅ Service uninstalled (macOS launchd)");
+  console.log(`${t.service.uninstalled} (macOS launchd)`);
 }
 
 // --- Linux systemd ---
@@ -414,20 +421,20 @@ WantedBy=default.target
     execSync("systemctl --user daemon-reload");
     execSync("systemctl --user enable liteyuki-local-agent");
     execSync("systemctl --user start liteyuki-local-agent");
-    console.log("✅ Service installed and started (systemd user)");
+    console.log(`${t.service.installSuccess} (systemd user)`);
     console.log(`   Unit:   ${servicePath}`);
     console.log("   Status: systemctl --user status liteyuki-local-agent");
     console.log("   Logs:   journalctl --user -u liteyuki-local-agent -f");
     console.log("   Stop:   systemctl --user stop liteyuki-local-agent");
   } catch (e) {
-    console.error("Failed to start service:", e);
+    console.error(t.service.failedStart, e);
   }
 }
 
 function uninstallSystemd(): void {
   const servicePath = getSystemdServicePath();
   if (!existsSync(servicePath)) {
-    console.log("Service not installed.");
+    console.log(t.service.notInstalledHint);
     return;
   }
   try {
@@ -438,5 +445,76 @@ function uninstallSystemd(): void {
   }
   unlinkSync(servicePath);
   execSync("systemctl --user daemon-reload");
-  console.log("✅ Service uninstalled (systemd user)");
+  console.log(`${t.service.uninstalled} (systemd user)`);
+}
+
+// ---------------------------------------------------------------------------
+// sudoers 免密配置（方案 B：高级用户可选）
+// ---------------------------------------------------------------------------
+
+const SUDOERS_FILE = "/etc/sudoers.d/liteyuki-agent";
+const SUDOERS_COMMANDS = [
+  "/usr/bin/apt",
+  "/usr/bin/apt-get",
+  "/usr/bin/dnf",
+  "/usr/bin/yum",
+  "/usr/bin/pacman",
+  "/usr/bin/systemctl",
+  "/usr/bin/docker",
+  "/usr/bin/journalctl",
+  "/usr/sbin/service",
+  "/usr/bin/snap",
+  "/usr/bin/flatpak",
+];
+
+function setupSudoers(): void {
+  const os = platform();
+  if (os === "win32") {
+    console.error("sudoers is not applicable on Windows.");
+    process.exit(1);
+  }
+
+  const user = process.env.USER || process.env.LOGNAME || "unknown";
+  if (user === "root") {
+    console.log("Already running as root, no sudoers needed.");
+    return;
+  }
+
+  const commands = SUDOERS_COMMANDS.join(", ");
+  const content = `# Generated by liteyuki-agent sudoers\n# Allows ${user} to run common admin commands without password\n${user} ALL=(ALL) NOPASSWD: ${commands}\n`;
+
+  console.log("This will create the following sudoers config:");
+  console.log(`──────────────────────────────`);
+  console.log(`File: ${SUDOERS_FILE}`);
+  console.log(`User: ${user}`);
+  console.log(`Commands (NOPASSWD):`);
+  for (const cmd of SUDOERS_COMMANDS) {
+    console.log(`  ${cmd}`);
+  }
+  console.log(`──────────────────────────────`);
+  console.log("\nRequires sudo to write. Proceeding...\n");
+
+  try {
+    // 用 tee 写入（需要 sudo 权限）
+    execSync(`echo '${content}' | sudo tee ${SUDOERS_FILE} > /dev/null`, {
+      stdio: ["inherit", "pipe", "pipe"],
+      encoding: "utf-8",
+    });
+    execSync(`sudo chmod 0440 ${SUDOERS_FILE}`, { stdio: "pipe" });
+    // 验证语法
+    execSync(`sudo visudo -c -f ${SUDOERS_FILE}`, { stdio: "pipe" });
+    console.log("✅ Sudoers config installed successfully!");
+    console.log(`   File: ${SUDOERS_FILE}`);
+    console.log(`   The following commands no longer require password:`);
+    for (const cmd of SUDOERS_COMMANDS) {
+      console.log(`     sudo ${cmd.split("/").pop()} ...`);
+    }
+    console.log("\n   To remove: sudo rm " + SUDOERS_FILE);
+  } catch (e) {
+    console.error("❌ Failed to install sudoers config.");
+    console.error("   Make sure you have sudo access and try again.");
+    if (e instanceof Error) {
+      console.error(`   Error: ${e.message}`);
+    }
+  }
 }

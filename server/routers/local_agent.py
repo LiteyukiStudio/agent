@@ -443,8 +443,9 @@ async def list_confirmations(
 async def approve_confirmation(
     request_id: str,
     user: User = Depends(get_current_user),
+    body: dict | None = None,
 ) -> dict:
-    """批准一个待确认的操作。"""
+    """批准一个待确认的操作。body 可选包含 password 字段（sudo 场景）。"""
     confirms = _confirmations.get(user.id, {})
     info = confirms.pop(request_id, None)
     if not info:
@@ -454,7 +455,10 @@ async def approve_confirmation(
     device_id = info.get("device_id", "")
     device = _connections.get(user.id, {}).get(device_id)
     if device:
-        await device.ws.send_json({"type": "confirm_response", "id": request_id, "approved": True})
+        msg: dict = {"type": "confirm_response", "id": request_id, "approved": True}
+        if body and body.get("password"):
+            msg["password"] = body["password"]
+        await device.ws.send_json(msg)
     return {"status": "approved"}
 
 
@@ -462,6 +466,7 @@ async def approve_confirmation(
 async def always_approve_confirmation(
     request_id: str,
     user: User = Depends(get_current_user),
+    body: dict | None = None,
 ) -> dict:
     """始终允许：批准操作并告知 local_agent 该会话后续不再询问同类命令。"""
     confirms = _confirmations.get(user.id, {})
@@ -472,7 +477,10 @@ async def always_approve_confirmation(
     device_id = info.get("device_id", "")
     device = _connections.get(user.id, {}).get(device_id)
     if device:
-        await device.ws.send_json({"type": "confirm_response", "id": request_id, "approved": True, "always": True})
+        msg: dict = {"type": "confirm_response", "id": request_id, "approved": True, "always": True}
+        if body and body.get("password"):
+            msg["password"] = body["password"]
+        await device.ws.send_json(msg)
     return {"status": "always_approved"}
 
 

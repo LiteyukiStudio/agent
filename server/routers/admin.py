@@ -172,3 +172,82 @@ async def update_user(
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     return UserResponse.model_validate(user)
+
+
+# ---------------------------------------------------------------------------
+# 管理员查看用户会话（只读）
+# ---------------------------------------------------------------------------
+
+
+@router.get("/users/{user_id}/sessions")
+async def admin_list_user_sessions(
+    user_id: str,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """管理员查看指定用户的会话列表（只读）。"""
+    from sqlalchemy import select as sa_select
+
+    from server.models.chat_session import ChatSession
+
+    result = await db.execute(
+        sa_select(ChatSession).where(ChatSession.user_id == user_id).order_by(ChatSession.created_at.desc()),
+    )
+    sessions = result.scalars().all()
+    return {
+        "sessions": [
+            {
+                "id": s.id,
+                "title": s.title,
+                "created_at": s.created_at.isoformat() if s.created_at else None,
+                "updated_at": s.updated_at.isoformat() if hasattr(s, "updated_at") and s.updated_at else None,
+                "is_public": s.is_public,
+            }
+            for s in sessions
+        ],
+    }
+
+
+@router.get("/users/{user_id}/sessions/{session_id}/messages")
+async def admin_view_session_messages(
+    user_id: str,
+    session_id: str,
+    _admin: User = Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+) -> dict:
+    """管理员查看指定用户的某个会话的消息（只读）。"""
+    from sqlalchemy import select as sa_select
+
+    from server.models.chat_session import ChatSession
+    from server.models.message import Message
+
+    # 验证会话属于该用户
+    result = await db.execute(
+        sa_select(ChatSession).where(ChatSession.id == session_id, ChatSession.user_id == user_id),
+    )
+    chat_session = result.scalar_one_or_none()
+    if chat_session is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    result = await db.execute(
+        sa_select(Message).where(Message.session_id == session_id).order_by(Message.created_at),
+    )
+    messages = result.scalars().all()
+
+    return {
+        "session": {
+            "id": chat_session.id,
+            "title": chat_session.title,
+            "user_id": user_id,
+        },
+        "messages": [
+            {
+                "id": m.id,
+                "role": m.role,
+                "content": m.content,
+                "tool_calls": m.tool_calls,
+                "created_at": m.created_at.isoformat() if m.created_at else None,
+            }
+            for m in messages
+        ],
+    }

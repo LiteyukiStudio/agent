@@ -26,6 +26,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [providers, setProviders] = useState<OAuthProvider[]>([])
+  const [showPasswordLogin, setShowPasswordLogin] = useState(false)
 
   useEffect(() => {
     if (user)
@@ -55,10 +56,13 @@ export function LoginPage() {
 
   function handleOAuth(providerId: string) {
     const base = import.meta.env.VITE_API_URL || ''
-    // Pass current frontend origin so the backend can redirect back after OAuth
     const redirectUrl = encodeURIComponent(window.location.origin)
     window.location.href = `${base}/api/v1/auth/oauth/login/${providerId}?redirect_url=${redirectUrl}`
   }
+
+  // 有 OAuth 提供商时：优先展示 OAuth，密码登录折叠
+  // 无 OAuth 提供商时：直接展示密码登录
+  const hasOAuth = providers.length > 0
 
   return (
     <div className="flex min-h-dvh items-center justify-center bg-background p-4">
@@ -71,42 +75,15 @@ export function LoginPage() {
           <p className="text-sm text-muted-foreground">{t('subtitle')}</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <Input
-              placeholder={t('username')}
-              value={username}
-              onChange={e => setUsername(e.target.value)}
-              required
-            />
-            <Input
-              type="password"
-              placeholder={t('password')}
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              required
-            />
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? t('loggingIn') : t('login')}
-            </Button>
-          </form>
-
-          {providers.length > 0 && (
+          {/* OAuth 登录（有提供商时优先展示） */}
+          {hasOAuth && !showPasswordLogin && (
             <>
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-card px-2 text-muted-foreground">{tc('or')}</span>
-                </div>
-              </div>
-
               <div className="space-y-2">
                 {providers.map(p => (
                   <Button
                     key={p.id}
                     variant="outline"
-                    className="w-full gap-2"
+                    className="w-full gap-2 h-10"
                     onClick={() => handleOAuth(p.id)}
                   >
                     <Bot className="size-4" />
@@ -114,6 +91,52 @@ export function LoginPage() {
                   </Button>
                 ))}
               </div>
+
+              <div className="pt-2 text-center">
+                <button
+                  type="button"
+                  onClick={() => setShowPasswordLogin(true)}
+                  className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
+                >
+                  {t('usePassword')}
+                </button>
+              </div>
+            </>
+          )}
+
+          {/* 密码登录（无 OAuth 时直接展示，有 OAuth 时折叠） */}
+          {(!hasOAuth || showPasswordLogin) && (
+            <>
+              <form onSubmit={handleSubmit} className="space-y-3">
+                <Input
+                  placeholder={t('username')}
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  required
+                />
+                <Input
+                  type="password"
+                  placeholder={t('password')}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  required
+                />
+                <Button type="submit" className="w-full" disabled={loading}>
+                  {loading ? t('loggingIn') : t('login')}
+                </Button>
+              </form>
+
+              {hasOAuth && (
+                <div className="pt-1 text-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowPasswordLogin(false)}
+                    className="text-xs text-muted-foreground hover:text-foreground transition-colors underline-offset-4 hover:underline"
+                  >
+                    {t('backToOAuth')}
+                  </button>
+                </div>
+              )}
             </>
           )}
         </CardContent>

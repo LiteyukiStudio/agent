@@ -132,3 +132,31 @@ export function executeTool(request: ToolRequest): ToolResponse {
     return { id, error: msg.slice(0, 5000) };
   }
 }
+
+/**
+ * 用 sudo -S 执行命令（通过 stdin 传入密码，密码不会出现在进程列表中）。
+ * 密码仅在内存中使用，绝不写盘/不打日志。
+ */
+export function executeSudoTool(request: ToolRequest, password: string): ToolResponse {
+  const { id, args } = request;
+  const cmd = args.command as string;
+  const cwd = args.cwd ? expandPath(args.cwd as string) : process.cwd();
+  const timeout = (args.timeout as number) || 30000;
+
+  try {
+    // 将 sudo 替换为 sudo -S（从 stdin 读密码），避免终端交互
+    const sudoCmd = cmd.replace(/\bsudo\b/, "sudo -S");
+    const output = execSync(sudoCmd, {
+      cwd,
+      timeout,
+      encoding: "utf-8",
+      maxBuffer: 1024 * 1024,
+      input: password + "\n",  // 通过 stdin 传密码
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    return { id, result: output.slice(0, 50000) };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return { id, error: msg.slice(0, 5000) };
+  }
+}

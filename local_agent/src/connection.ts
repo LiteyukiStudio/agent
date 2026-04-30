@@ -2,7 +2,8 @@
  * WebSocket 客户端：反向连接云端，接收并执行指令
  */
 import WebSocket from "ws";
-import { executeTool, isDangerous } from "./tools.js";
+import { executeSudoTool, executeTool, isDangerous } from "./tools.js";
+import { t } from "./i18n/index.js";
 import type { ToolRequest, ToolResponse } from "./tools.js";
 
 export type ConnectionStatus =
@@ -100,7 +101,7 @@ function doConnect(): void {
       }
       // 服务端转发的确认响应（Web 前端审批结果）
       if (msg.type === "confirm_response") {
-        handleConfirmResponse(msg.id, msg.approved, msg.always);
+        handleConfirmResponse(msg.id, msg.approved, msg.always, msg.password);
         return;
       }
       const request = msg as ToolRequest;
@@ -119,7 +120,7 @@ function doConnect(): void {
     if (code === 4002 || code === 4003) {
       shouldReconnect = false;
       const reasonStr = reason?.toString() || "Kicked by another session";
-      events?.onStatusChange("disconnected", `⚠ ${reasonStr}. 不再重连。`);
+      events?.onStatusChange("disconnected", `⚠ ${reasonStr}. ${t.connection.kicked}`);
       return;
     }
 
@@ -145,32 +146,39 @@ function scheduleReconnect(): void {
 }
 
 // 等待 Web 前端审批的 pending map: request_id → {resolve, timer}
+interface ConfirmResult {
+  action: "approve" | "reject" | "always";
+  password?: string;  // sudo 密码（如果用户填了的话）
+}
 const pendingConfirms: Map<string, {
-  resolve: (result: "approve" | "reject" | "always") => void;
+  resolve: (result: ConfirmResult) => void;
   timer: ReturnType<typeof setTimeout>;
 }> = new Map();
 
 // 本次会话中被「始终允许」的命令（连接断开后清空）
 const sessionAllowedCommands: Set<string> = new Set();
 
+// 本次会话缓存的 sudo 密码（连接断开后清空，绝不写盘）
+let cachedSudoPassword: string | null = null;
+
 /** 处理服务端发来的确认响应 */
-export function handleConfirmResponse(id: string, approved: boolean, always?: boolean): void {
+export function handleConfirmResponse(id: string, approved: boolean, always?: boolean, password?: string): void {
   const pending = pendingConfirms.get(id);
   if (pending) {
     clearTimeout(pending.timer);
     pendingConfirms.delete(id);
     if (!approved) {
-      pending.resolve("reject");
+      pending.resolve({ action: "reject" });
     } else if (always) {
-      pending.resolve("always");
+      pending.resolve({ action: "always", password });
     } else {
-      pending.resolve("approve");
+      pending.resolve({ action: "approve", password });
     }
   }
 }
 
-/** 通过 Web 前端请求用户审批 */
-function requestWebConfirmation(request: ToolRequest): Promise<"approve" | "reject" | "always"> {
+/** 通过 Web 前端请求用户审批（可带密码输入） */
+function requestWebConfirmation(request: ToolRequest, needsPassword: boolean = false): Promise<ConfirmResult> {
   return new Promise((resolve) => {
     // 发送确认请求到服务端，由 Web 前端展示
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -179,45 +187,55 @@ function requestWebConfirmation(request: ToolRequest): Promise<"approve" | "reje
         id: request.id,
         tool: request.tool,
         args: request.args,
+        needs_password: needsPassword,
       }));
     }
     // 超时 120 秒自动拒绝
     const timer = setTimeout(() => {
       pendingConfirms.delete(request.id);
-      resolve("reject");
+      resolve({ action: "reject" });
     }, 120000);
     pendingConfirms.set(request.id, { resolve, timer });
   });
 }
 
+/** 检测命令是否需要 sudo */
+function needsSudo(command: string): boolean {
+  return /\bsudo\b/i.test(command);
+}
+
 async function handleRequest(request: ToolRequest): Promise<void> {
+  const command = typeof request.args.command === "string" ? request.args.command : "";
+  const isSudoCommand = request.tool === "run_command" && needsSudo(command);
+
   // Check if dangerous — skip confirmation if autoApprove is on
   if (
     !autoApprove &&
     request.tool === "run_command" &&
-    typeof request.args.command === "string" &&
-    isDangerous(request.args.command)
+    isDangerous(command)
   ) {
     // 检查是否在本次会话中已被「始终允许」
-    if (!sessionAllowedCommands.has(request.args.command)) {
+    if (!sessionAllowedCommands.has(command)) {
+      // sudo 命令：如果没有缓存密码则需要密码
+      const requirePassword = isSudoCommand && !cachedSudoPassword;
+
       // 通过 Web 前端请求审批
-      const result = await requestWebConfirmation(request);
-      if (result === "always") {
-        // 「始终允许」：记录该命令，后续不再询问
-        sessionAllowedCommands.add(request.args.command);
-      } else if (result === "reject") {
+      const result = await requestWebConfirmation(request, requirePassword);
+      if (result.action === "always") {
+        sessionAllowedCommands.add(command);
+        // 如果用户提供了密码且勾选记住，缓存密码
+        if (result.password) {
+          cachedSudoPassword = result.password;
+        }
+      } else if (result.action === "approve") {
+        // 一次性使用密码
+        if (result.password && !cachedSudoPassword) {
+          cachedSudoPassword = result.password;
+        }
+      } else {
         const response: ToolResponse = {
           id: request.id,
-          error: [
-            "⚠️ 用户拒绝了此操作。该命令被安全策略拦截。",
-            "【严格禁止】你不得通过任何方式绕过此限制，包括但不限于：",
-            "- 使用 python/node/ruby/perl 等脚本语言间接执行系统命令",
-            "- 使用 os.system()、subprocess、exec() 等函数",
-            "- 将命令写入脚本文件再执行",
-            "- 编码/混淆命令内容",
-            "- 拆分命令为多步执行",
-            "如果需要执行被拒绝的操作，请直接告知用户原因并请求用户手动执行。",
-          ].join("\n"),
+          error: t.confirm.rejected,
         };
         sendResponse(response);
         events?.onResponse(response);
@@ -226,9 +244,20 @@ async function handleRequest(request: ToolRequest): Promise<void> {
     }
   }
 
-  const response = executeTool(request);
-  sendResponse(response);
-  events?.onResponse(response);
+  // 执行命令（如果是 sudo 且有缓存密码，注入密码）
+  if (isSudoCommand && cachedSudoPassword) {
+    const response = executeSudoTool(request, cachedSudoPassword);
+    // 如果密码错误，清除缓存
+    if (response.error && response.error.includes("incorrect password")) {
+      cachedSudoPassword = null;
+    }
+    sendResponse(response);
+    events?.onResponse(response);
+  } else {
+    const response = executeTool(request);
+    sendResponse(response);
+    events?.onResponse(response);
+  }
 }
 
 function sendResponse(response: ToolResponse): void {

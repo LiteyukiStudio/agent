@@ -1,4 +1,6 @@
+import { MessageSquare } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
+import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -40,6 +42,7 @@ function formatTokens(n: number): string {
 
 export function UsersPage() {
   const { user: me } = useAuth()
+  const navigate = useNavigate()
   useTitle('Users')
   const [users, setUsers] = useState<UserItem[]>([])
   const [stats, setStats] = useState<UsageStats | null>(null)
@@ -145,6 +148,18 @@ export function UsersPage() {
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      {/* 查看会话（非管理员用户） */}
+                      {u.role !== 'superuser' && u.role !== 'admin' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1"
+                          onClick={() => navigate(`/admin/users/${u.id}/sessions`)}
+                        >
+                          <MessageSquare className="size-3" />
+                          Sessions
+                        </Button>
+                      )}
                       {u.role !== 'superuser' && u.id !== me?.id && (
                         <DropdownMenu>
                           <DropdownMenuTrigger

@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import { getConfig, getDeviceId } from "./config.js";
 import { connect, disconnect, setEvents } from "./connection.js";
 import { getDeviceName, getOsType, wsUrl } from "./auth.js";
+import { t } from "./i18n/index.js";
 
 const require = createRequire(import.meta.url);
 const pkg = require("../package.json") as { version: string };
@@ -18,20 +19,23 @@ export function runDaemon(): void {
   const cfg = getConfig();
 
   if (!cfg.baseUrl || !cfg.token) {
-    log("ERROR", "No credentials found. Run `liteyuki-agent` interactively first to login.");
+    log("ERROR", t.daemon.noCredentials);
     process.exit(1);
   }
 
   const deviceId = getDeviceId();
   const deviceName = getDeviceName();
   log("INFO", `Liteyuki Local Agent (daemon) - ${deviceName} [${deviceId.slice(0, 8)}]`);
-  log("INFO", `Server: ${cfg.baseUrl}`);
+  log("INFO", `${t.daemon.server} ${cfg.baseUrl}`);
 
   setEvents({
     onStatusChange: (status, msg) => {
-      if (status === "connected") log("INFO", "Connected to server");
-      else if (status === "error") log("ERROR", `Connection error: ${msg}`);
-      else if (status === "disconnected") log("WARN", "Disconnected, will retry...");
+      if (status === "connected") log("INFO", t.connection.connected);
+      else if (status === "error") log("ERROR", `${t.connection.error} ${msg}`);
+      else if (status === "disconnected") {
+        if (msg) log("WARN", msg);
+        else log("WARN", t.connection.reconnecting);
+      }
     },
     onRequest: (req) => {
       log("INFO", `<- ${req.tool}(${JSON.stringify(req.args).slice(0, 200)})`);
@@ -51,17 +55,17 @@ export function runDaemon(): void {
     `/ws/local-agent?token=${encodeURIComponent(cfg.token)}&device_id=${encodeURIComponent(deviceId)}&device_name=${encodeURIComponent(deviceName)}&os=${encodeURIComponent(os)}&version=${encodeURIComponent(pkg.version)}`,
   );
 
-  log("INFO", "Connecting...");
+  log("INFO", t.connection.connecting);
   connect(fullWsUrl, cfg.token);
 
   process.on("SIGINT", () => {
-    log("INFO", "Received SIGINT, shutting down...");
+    log("INFO", t.daemon.sigint);
     disconnect();
     process.exit(0);
   });
 
   process.on("SIGTERM", () => {
-    log("INFO", "Received SIGTERM, shutting down...");
+    log("INFO", t.daemon.sigterm);
     disconnect();
     process.exit(0);
   });
