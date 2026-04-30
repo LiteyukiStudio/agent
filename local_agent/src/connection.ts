@@ -111,9 +111,18 @@ function doConnect(): void {
     }
   });
 
-  ws.on("close", () => {
+  ws.on("close", (code, reason) => {
     ws = null;
     if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
+
+    // 被同设备新连接踢出 (4002) 或被用户移除 (4003)：停止重连
+    if (code === 4002 || code === 4003) {
+      shouldReconnect = false;
+      const reasonStr = reason?.toString() || "Kicked by another session";
+      events?.onStatusChange("disconnected", `⚠ ${reasonStr}. 不再重连。`);
+      return;
+    }
+
     events?.onStatusChange("disconnected");
     scheduleReconnect();
   });

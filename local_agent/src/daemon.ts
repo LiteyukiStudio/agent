@@ -1,9 +1,13 @@
 /**
  * Headless 后台模式：无 TUI，纯日志输出，适合 systemd/launchd
  */
+import { createRequire } from "node:module";
 import { getConfig, getDeviceId } from "./config.js";
 import { connect, disconnect, setEvents } from "./connection.js";
 import { getDeviceName, getOsType, wsUrl } from "./auth.js";
+
+const require = createRequire(import.meta.url);
+const pkg = require("../package.json") as { version: string };
 
 function log(level: string, msg: string): void {
   const ts = new Date().toISOString();
@@ -44,7 +48,7 @@ export function runDaemon(): void {
   const os = getOsType();
   const fullWsUrl = wsUrl(
     cfg.baseUrl,
-    `/ws/local-agent?token=${encodeURIComponent(cfg.token)}&device_id=${encodeURIComponent(deviceId)}&device_name=${encodeURIComponent(deviceName)}&os=${encodeURIComponent(os)}`,
+    `/ws/local-agent?token=${encodeURIComponent(cfg.token)}&device_id=${encodeURIComponent(deviceId)}&device_name=${encodeURIComponent(deviceName)}&os=${encodeURIComponent(os)}&version=${encodeURIComponent(pkg.version)}`,
   );
 
   log("INFO", "Connecting...");

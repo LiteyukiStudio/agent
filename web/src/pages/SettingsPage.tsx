@@ -29,7 +29,16 @@ interface UsageStats {
 }
 
 interface DevicesResponse {
-  devices: { id: string, device_id: string, device_name: string, os_type: string, online: boolean, last_seen_at: string | null }[]
+  devices: {
+    id: string
+    device_id: string
+    device_name: string
+    os_type: string
+    online: boolean
+    version: string | null
+    latest_version: string | null
+    last_seen_at: string | null
+  }[]
   count: number
 }
 
@@ -203,11 +212,21 @@ export function SettingsPage() {
                           <p className={`text-sm font-medium ${!d.online ? 'text-muted-foreground' : ''}`}>{d.device_name}</p>
                           <p className="text-xs text-muted-foreground">
                             {d.device_id.slice(0, 8)}
+                            {d.online && d.version && ` · v${d.version}`}
                             {!d.online && d.last_seen_at && ` · 最后在线 ${new Date(d.last_seen_at).toLocaleString()}`}
                           </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        {d.online && d.version && d.latest_version && d.version !== d.latest_version && (
+                          <span
+                            className="cursor-default rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+                            title={`当前 v${d.version}，最新 v${d.latest_version}\n运行 liteyuki-agent restart 更新`}
+                          >
+                            可更新 → v
+                            {d.latest_version}
+                          </span>
+                        )}
                         <Badge variant={d.online ? 'default' : 'secondary'} className={d.online ? 'bg-emerald-500 hover:bg-emerald-500' : ''}>
                           {d.online ? '在线' : '离线'}
                         </Badge>

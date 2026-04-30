@@ -47,6 +47,18 @@ switch (command) {
     uninstallService();
     break;
 
+  case "start":
+    startService();
+    break;
+
+  case "stop":
+    stopService();
+    break;
+
+  case "restart":
+    restartService();
+    break;
+
   case "status":
     showStatus();
     break;
@@ -123,8 +135,11 @@ Usage: liteyuki-agent [command] [flags]
 Commands:
   (none)          Start interactive TUI mode
   -d, --daemon    Run in headless daemon mode
-  install         Install as system service (auto-start)
+  install         Install as system service (auto-start on boot)
   uninstall       Remove system service
+  start           Start the background service
+  stop            Stop the background service
+  restart         Restart the background service (useful after update)
   status          Show service status
   info            Show device info and config
   logout          Clear saved credentials
@@ -138,8 +153,9 @@ Examples:
   liteyuki-agent              # Interactive login & connect
   liteyuki-agent -d           # Background mode (after login)
   liteyuki-agent -d -y        # Background + auto-approve all commands
-  liteyuki-agent -y           # Interactive + auto-approve
   liteyuki-agent install      # Auto-start on boot
+  liteyuki-agent restart      # Restart after update
+  liteyuki-agent stop         # Stop background service
   liteyuki-agent info         # Check device ID and config
 `);
 }
@@ -209,6 +225,89 @@ function uninstallService(): void {
   } else {
     console.error(`Unsupported platform: ${os}`);
     process.exit(1);
+  }
+}
+
+function stopService(): void {
+  const os = platform();
+  if (os === "darwin") {
+    const plistPath = getLaunchdPlistPath();
+    if (!existsSync(plistPath)) {
+      console.log("Service not installed. Run `liteyuki-agent install` first.");
+      return;
+    }
+    try {
+      execSync(`launchctl unload ${plistPath}`);
+      console.log("✅ Service stopped");
+    } catch {
+      console.log("Service is not running.");
+    }
+  } else if (os === "linux") {
+    try {
+      execSync("systemctl --user stop liteyuki-local-agent");
+      console.log("✅ Service stopped");
+    } catch {
+      console.log("Service is not running.");
+    }
+  } else {
+    console.error(`Unsupported platform: ${os}`);
+  }
+}
+
+function startService(): void {
+  const os = platform();
+  if (os === "darwin") {
+    const plistPath = getLaunchdPlistPath();
+    if (!existsSync(plistPath)) {
+      console.log("Service not installed. Run `liteyuki-agent install` first.");
+      return;
+    }
+    try {
+      execSync(`launchctl load ${plistPath}`);
+      console.log("✅ Service started");
+    } catch {
+      console.log("Service may already be running. Use `liteyuki-agent status` to check.");
+    }
+  } else if (os === "linux") {
+    try {
+      execSync("systemctl --user start liteyuki-local-agent");
+      console.log("✅ Service started");
+    } catch (e) {
+      console.error("Failed to start service:", e);
+    }
+  } else {
+    console.error(`Unsupported platform: ${os}`);
+  }
+}
+
+function restartService(): void {
+  const os = platform();
+  if (os === "darwin") {
+    const plistPath = getLaunchdPlistPath();
+    if (!existsSync(plistPath)) {
+      console.log("Service not installed. Run `liteyuki-agent install` first.");
+      return;
+    }
+    try {
+      execSync(`launchctl unload ${plistPath}`);
+    } catch {
+      // May not be loaded
+    }
+    try {
+      execSync(`launchctl load ${plistPath}`);
+      console.log("✅ Service restarted");
+    } catch (e) {
+      console.error("Failed to restart service:", e);
+    }
+  } else if (os === "linux") {
+    try {
+      execSync("systemctl --user restart liteyuki-local-agent");
+      console.log("✅ Service restarted");
+    } catch (e) {
+      console.error("Failed to restart service:", e);
+    }
+  } else {
+    console.error(`Unsupported platform: ${os}`);
   }
 }
 

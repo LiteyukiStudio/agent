@@ -41,12 +41,14 @@ class DeviceInfo:
         ws: WebSocket,
         token_id: str = "",
         os_type: str = "unknown",
+        version: str = "",
     ) -> None:
         self.device_id = device_id
         self.device_name = device_name
         self.ws = ws
         self.token_id = token_id
         self.os_type = os_type
+        self.version = version
 
 
 # ---------------------------------------------------------------------------
@@ -57,6 +59,32 @@ _connections: dict[str, dict[str, DeviceInfo]] = {}
 _pending: dict[str, dict[str, asyncio.Future[dict]]] = {}
 # 用户待确认操作：user_id → {request_id → confirm_info}
 _confirmations: dict[str, dict[str, dict]] = {}
+
+# npm 最新版本缓存
+_latest_version_cache: dict[str, float | str] = {"version": "", "ts": 0.0}
+
+
+async def _get_latest_agent_version() -> str | None:
+    """获取 local_agent npm 包的最新版本（带 5 分钟缓存）。"""
+    import time
+
+    import httpx
+
+    now = time.time()
+    if _latest_version_cache["version"] and now - float(_latest_version_cache["ts"]) < 300:
+        return str(_latest_version_cache["version"]) or None
+
+    try:
+        async with httpx.AsyncClient(timeout=5) as client:
+            resp = await client.get("https://registry.npmjs.org/liteyuki-local-agent/latest")
+            if resp.status_code == 200:
+                ver = resp.json().get("version", "")
+                _latest_version_cache["version"] = ver
+                _latest_version_cache["ts"] = now
+                return ver or None
+    except Exception:
+        pass
+    return str(_latest_version_cache["version"]) or None
 
 
 async def _resolve_user_id(token: str) -> tuple[str | None, str]:
@@ -96,6 +124,7 @@ def get_connected_devices(user_id: str) -> list[dict]:
             "device_name": d.device_name,
             "os_type": d.os_type,
             "token_id": d.token_id,
+            "version": d.version,
         }
         for d in devices.values()
     ]
@@ -191,6 +220,7 @@ async def local_agent_websocket(
     device_id: str = Query(default=""),
     device_name: str = Query(default="unknown"),
     os: str = Query(default="unknown"),
+    version: str = Query(default=""),
 ) -> None:
     """本地 Agent 的 WebSocket 连接端点。
 
@@ -241,7 +271,7 @@ async def local_agent_websocket(
         with contextlib.suppress(Exception):
             await old.ws.close(code=4002, reason="New connection from same device")
 
-    _connections[user_id][device_id] = DeviceInfo(device_id, device_name, ws, token_id, os)
+    _connections[user_id][device_id] = DeviceInfo(device_id, device_name, ws, token_id, os, version)
 
     # 启动应用层 ping 保活（每 10 秒发一次，防止中间代理超时关闭空闲连接）
     async def ping_loop() -> None:
@@ -328,7 +358,11 @@ async def list_devices(
         sa_select(Device).where(Device.user_id == user.id).order_by(Device.created_at.desc()),
     )
     all_devices = result.scalars().all()
-    online_ids = set(_connections.get(user.id, {}).keys())
+    online_devices = _connections.get(user.id, {})
+    online_ids = set(online_devices.keys())
+
+    # 获取 npm 上的最新版本（缓存 5 分钟）
+    latest_version = await _get_latest_agent_version()
 
     devices = [
         {
@@ -337,6 +371,8 @@ async def list_devices(
             "device_name": d.device_name,
             "os_type": d.os_type,
             "online": d.device_id in online_ids,
+            "version": online_devices[d.device_id].version if d.device_id in online_ids else None,
+            "latest_version": latest_version,
             "last_seen_at": d.last_seen_at.isoformat() if d.last_seen_at else None,
             "created_at": d.created_at.isoformat() if d.created_at else None,
         }
