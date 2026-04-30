@@ -286,6 +286,11 @@ function OptionsBlock({ question, options, mode = 'single', icons, onSend }: {
 }
 
 const TOOL_CALLS_COLLAPSE_THRESHOLD = 3
+const INTERNAL_TOOLS = new Set(['set_conversation_title', 'recall_memories', 'remember_user', 'forget_user'])
+
+function isInternalTool(toolName: string): boolean {
+  return INTERNAL_TOOLS.has(toolName)
+}
 
 /** 连续工具调用组：超过阈值时折叠 */
 function ToolCallGroup({ toolCalls }: { toolCalls: ToolCall[] }) {
@@ -358,7 +363,7 @@ function ToolCallGroup({ toolCalls }: { toolCalls: ToolCall[] }) {
 }
 
 /** 渲染交错排列的消息内容（文本 + thinking + 工具调用） */
-function InterleavedParts({ parts, onSend }: { parts: MessagePart[], onSend?: (content: string) => void }) {
+function InterleavedParts({ parts, onSend, showInternalTools }: { parts: MessagePart[], onSend?: (content: string) => void, showInternalTools: boolean }) {
   // 将连续的 tool_call 分组
   const groups: Array<
     | { type: 'text', content: string }
@@ -378,6 +383,8 @@ function InterleavedParts({ parts, onSend }: { parts: MessagePart[], onSend?: (c
       groups.push({ type: 'options', toolCall: part.toolCall })
     }
     else {
+      if (!showInternalTools && isInternalTool(part.toolCall.name))
+        continue
       // tool_call: 和前一个 tool_calls 组合并
       const last = groups[groups.length - 1]
       if (last && last.type === 'tool_calls') {
@@ -431,7 +438,7 @@ function InterleavedParts({ parts, onSend }: { parts: MessagePart[], onSend?: (c
 
 export function MessageBubble({ message, onRegenerate, onResend, onSend, readOnly }: MessageBubbleProps) {
   const isUser = message.role === 'user'
-  const { user } = useAuth()
+  const { user, isAdmin } = useAuth()
   const [showActions, setShowActions] = useState(false)
 
   function handleCopy() {
@@ -474,7 +481,7 @@ export function MessageBubble({ message, onRegenerate, onResend, onSend, readOnl
                     <ThinkingBlock content={message.thinking} />
                   )}
                   {message.parts && message.parts.length > 0
-                    ? <InterleavedParts parts={message.parts} onSend={onSend} />
+                    ? <InterleavedParts parts={message.parts} onSend={onSend} showInternalTools={isAdmin} />
                     : (
                         <div className={markdownClasses}>
                           <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{message.content}</Markdown>

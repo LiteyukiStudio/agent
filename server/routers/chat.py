@@ -33,7 +33,19 @@ async def list_sessions(
 ) -> list[SessionResponse]:
     """列出当前用户的所有聊天会话。"""
     sessions = await chat_service.list_sessions(db, user.id)
-    return [SessionResponse.model_validate(s) for s in sessions]
+    missing_preview_ids = [s.id for s in sessions if not s.last_message]
+    fallback_previews = await chat_service.get_latest_message_previews(db, missing_preview_ids)
+    return [
+        SessionResponse(
+            id=s.id,
+            title=s.title,
+            is_public=s.is_public,
+            last_message=s.last_message or fallback_previews.get(s.id),
+            created_at=s.created_at,
+            updated_at=s.updated_at,
+        )
+        for s in sessions
+    ]
 
 
 @router.post("/sessions", response_model=SessionResponse, status_code=status.HTTP_201_CREATED)

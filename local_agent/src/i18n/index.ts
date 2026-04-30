@@ -6,6 +6,8 @@
  *   2. 环境变量 LANG / LC_ALL / LC_MESSAGES
  *   3. Fallback: zh-CN（默认中文）
  */
+import { execFileSync } from "node:child_process";
+import { platform } from "node:os";
 import type enMessages from "./en.js";
 import en from "./en.js";
 import zhCN from "./zh-CN.js";
@@ -18,26 +20,73 @@ const locales: Record<string, Messages> = {
   zh: zhCN as unknown as Messages,
 };
 
+function normalizeLocale(raw: string | undefined): string | null {
+  if (!raw)
+    return null;
+  const value = raw.trim();
+  if (!value || value === "C" || value === "POSIX")
+    return null;
+
+  // LANGUAGE 可能是 "zh_CN:zh:en_US"，逐个候选尝试。
+  for (const candidate of value.split(":")) {
+    const locale = candidate.split(".")[0]?.replace("_", "-");
+    const match = locale?.match(/^([a-z]{2,3})(?:-([a-zA-Z]{2}|Hans|Hant))?/i);
+    if (!match)
+      continue;
+
+    const lang = match[1].toLowerCase();
+    const region = match[2];
+    if (lang === "zh")
+      return "zh";
+    if (region) {
+      const full = `${lang}-${region.toUpperCase()}`;
+      if (full in locales)
+        return full;
+    }
+    if (lang in locales)
+      return lang;
+  }
+  return null;
+}
+
+function detectMacOSLocale(): string | null {
+  if (platform() !== "darwin")
+    return null;
+  try {
+    const output = execFileSync("defaults", ["read", "-g", "AppleLanguages"], {
+      encoding: "utf-8",
+      timeout: 1000,
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    return normalizeLocale(output);
+  }
+  catch {
+    return null;
+  }
+}
+
 /** 检测当前系统语言 */
 function detectLocale(): string {
   // 用户强制覆盖
-  const override = process.env.LITEYUKI_LANG;
-  if (override && override in locales) return override;
+  const override = normalizeLocale(process.env.LITEYUKI_LANG);
+  if (override)
+    return override;
 
-  // 从系统环境变量检测
-  const envLang = process.env.LC_ALL || process.env.LC_MESSAGES || process.env.LANG || "";
-  // 解析如 "zh_CN.UTF-8" → "zh-CN"
-  const match = envLang.match(/^([a-z]{2})(?:[_-]([A-Z]{2}))?/i);
-  if (match) {
-    const lang = match[1].toLowerCase();
-    const region = match[2]?.toUpperCase();
-    // 精确匹配 zh-CN
-    if (region) {
-      const full = `${lang}-${region}`;
-      if (full in locales) return full;
-    }
-    // 语言码 fallback
-    if (lang in locales) return lang;
+  // Ubuntu/GNOME 常用 LANGUAGE 表示界面语言，例如 zh_CN:zh。
+  const language = normalizeLocale(process.env.LANGUAGE);
+  if (language)
+    return language;
+
+  // macOS 的 LANG 经常是 en_US.UTF-8，即使系统界面是中文；优先读取 AppleLanguages。
+  const macLocale = detectMacOSLocale();
+  if (macLocale)
+    return macLocale;
+
+  // 从 POSIX locale 环境变量检测。
+  for (const envLang of [process.env.LC_ALL, process.env.LC_MESSAGES, process.env.LANG]) {
+    const locale = normalizeLocale(envLang);
+    if (locale)
+      return locale;
   }
 
   return "zh";

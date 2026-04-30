@@ -1,5 +1,5 @@
 import type { ToolCall } from '@/types/chat'
-import { AlertCircle, ChevronDown, ChevronRight, Monitor, Wrench } from 'lucide-react'
+import { AlertCircle, ChevronDown, ChevronRight, EyeOff, Monitor, Wrench } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FaApple, FaCentos, FaFedora, FaLinux, FaRedhat, FaSuse, FaUbuntu, FaWindows } from 'react-icons/fa6'
@@ -49,6 +49,7 @@ function parseDeviceInfo(result: string | undefined): { cleanResult: string, dev
 
 /** local_agent 相关工具名 */
 const LOCAL_TOOLS = new Set(['local_run_command', 'local_read_file', 'local_write_file', 'local_list_files', 'local_list_devices'])
+const INTERNAL_TOOLS = new Set(['set_conversation_title', 'recall_memories', 'remember_user', 'forget_user'])
 
 interface ToolCallCardProps {
   toolCall: ToolCall
@@ -74,6 +75,7 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
 
   const { cleanResult, device } = parseDeviceInfo(toolCall.result)
   const isLocalTool = LOCAL_TOOLS.has(toolCall.name)
+  const isInternalTool = INTERNAL_TOOLS.has(toolCall.name)
 
   // 设备名称：优先从结果中解析，running 时 fallback 到 args.device
   const deviceLabel = device?.device_name || (isLocalTool && toolCall.args.device as string) || null
@@ -89,7 +91,9 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
         {expanded ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
         {toolCall.status === 'error'
           ? <AlertCircle className="size-3 shrink-0 text-red-500" />
-          : <Wrench className="size-3 shrink-0 text-muted-foreground" />}
+          : isInternalTool
+            ? <EyeOff className="size-3 shrink-0 text-muted-foreground" />
+            : <Wrench className="size-3 shrink-0 text-muted-foreground" />}
         <span className="font-medium">{toolCall.name}</span>
         <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 shrink-0 ${statusColor[toolCall.status]}`}>
           {t(`toolStatus.${toolCall.status}`)}

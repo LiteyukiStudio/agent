@@ -9,7 +9,7 @@ export default {
       flags: "Flags:",
       examples: "Examples:",
       cmdNone: "(none)          Start interactive TUI mode",
-      cmdDaemon: "-d, --daemon    Run in headless daemon mode",
+      cmdDaemon: "-d, --daemon    Detach and run in background (headless, SSH-friendly)",
       cmdInstall: "install         Install as system service (auto-start on boot)",
       cmdUninstall: "uninstall       Remove system service",
       cmdStart: "start           Start the background service",

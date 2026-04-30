@@ -12,7 +12,7 @@ from google.adk.agents.run_config import RunConfig, StreamingMode
 from google.adk.runners import Runner
 from google.adk.sessions.database_session_service import DatabaseSessionService
 from google.genai import types
-from sqlalchemy import select
+from sqlalchemy import case, select, update
 
 from server.config import settings
 from server.models.chat_session import ChatSession
@@ -39,6 +39,22 @@ _session_service: BaseSessionService | None = None
 # 会被自动持久化到 UserConfig 表，实现跨会话访问。
 # 新增 Agent 时在这里添加对应的 namespace。
 PERSIST_CREDENTIAL_NAMESPACES: set[str] = {"gitea", "misskey", "memory"}
+
+
+def _extract_title_update(response_data: object) -> str | None:
+    """从 set_conversation_title 工具响应中提取成功更新后的标题。"""
+    if isinstance(response_data, dict):
+        if response_data.get("ok") is True and isinstance(response_data.get("title"), str):
+            return response_data["title"].strip() or None
+        result = response_data.get("result")
+        if isinstance(result, str):
+            return _extract_title_update(result)
+    if isinstance(response_data, str):
+        try:
+            return _extract_title_update(json.loads(response_data))
+        except json.JSONDecodeError:
+            return None
+    return None
 
 
 def _get_adk_db_url() -> str:
@@ -86,6 +102,28 @@ async def list_sessions(db: AsyncSession, user_id: str) -> list[ChatSession]:
         select(ChatSession).where(ChatSession.user_id == user_id).order_by(ChatSession.updated_at.desc()),
     )
     return list(result.scalars().all())
+
+
+async def get_latest_message_previews(db: AsyncSession, session_ids: list[str]) -> dict[str, str]:
+    """读取每个会话的最新非空消息预览，作为 last_message 的兜底来源。
+
+    这是有意采用的笨办法：逐个会话查询，避免复杂窗口函数和跨数据库兼容问题。
+    """
+    previews: dict[str, str] = {}
+    for session_id in session_ids:
+        result = await db.execute(
+            select(Message.content)
+            .where(Message.session_id == session_id, Message.content != "")
+            .order_by(
+                Message.created_at.desc(),
+                case((Message.role == "assistant", 0), else_=1),
+            )
+            .limit(1),
+        )
+        content = result.scalar_one_or_none()
+        if content:
+            previews[session_id] = content[:200]
+    return previews
 
 
 async def create_session(db: AsyncSession, user_id: str, title: str = "New Chat") -> ChatSession:
@@ -279,6 +317,8 @@ async def stream_response(
 
     # 注入用户配置到 state_delta（通过 run_async 参数传入，确保 ADK 正确持久化）
     injected_state: dict = {"__user_id": user.id}
+    if session_id:
+        injected_state["__chat_session_id"] = session_id
     user_configs = await get_all_raw_configs(db, user.id)
     for namespace, kv in user_configs.items():
         for key, value in kv.items():
@@ -462,6 +502,19 @@ async def stream_response(
                                     )
                                 await queue.put(f"data: {sse_data}\n\n")
 
+                                if not is_tool_error and part.function_response.name == "set_conversation_title":
+                                    updated_title = _extract_title_update(response_data)
+                                    if updated_title:
+                                        title_data = json.dumps(
+                                            {
+                                                "event": "session_title_updated",
+                                                "session_id": session_id,
+                                                "title": updated_title,
+                                            },
+                                            ensure_ascii=False,
+                                        )
+                                        await queue.put(f"data: {title_data}\n\n")
+
                     # 定期 flush（每 _FLUSH_INTERVAL 秒）
                     now = asyncio.get_event_loop().time()
                     if now - last_flush >= _FLUSH_INTERVAL:
@@ -507,41 +560,13 @@ async def stream_response(
                     await bg_db.delete(bg_assistant_msg)
                     await bg_db.commit()
 
-                # 更新会话摘要 + 自动标题
-                updated_title = None
+                # 更新会话摘要。会话标题由 set_conversation_title 工具在 Agent 回复过程中静默维护。
                 if session_id:
-                    # 确保能读到最新数据（请求级 db commit 的用户消息）
-                    await bg_db.expire_all()
-                    result = await bg_db.execute(select(ChatSession).where(ChatSession.id == session_id))
-                    chat_session = result.scalar_one_or_none()
-                    if chat_session:
-                        # 更新会话最后消息预览
-                        if assistant_text:
-                            chat_session.last_message = assistant_text[:200]
-                        elif not chat_session.last_message:
-                            # AI 无文本回复时，用用户消息作为预览
-                            chat_session.last_message = content[:200]
-                        if not chat_session.title_custom and content.strip():
-                            msg_count = _user_msg_count
-                            # 首次对话生成标题，之后每 5 次更新一次（第1、6、11、16...次）
-                            should_update = msg_count == 1 or (msg_count > 1 and (msg_count - 1) % 5 == 0)
-                            logger.info(
-                                "Title check: session=%s msg_count=%d should_update=%s",
-                                session_id,
-                                msg_count,
-                                should_update,
-                            )
-                            if should_update:
-                                from server.services.title_gen import generate_title
-
-                                ai_title = await generate_title(content, assistant_text)
-                                logger.info("Title generated: %s (session=%s)", ai_title, session_id)
-                                if ai_title:
-                                    chat_session.title = ai_title
-                                    updated_title = ai_title
-                                elif chat_session.title == "New Chat":
-                                    chat_session.title = "新对话"
-                        await bg_db.commit()
+                    last_msg_preview = (assistant_text[:200]) if assistant_text else content[:200]
+                    await bg_db.execute(
+                        update(ChatSession).where(ChatSession.id == session_id).values(last_message=last_msg_preview)
+                    )
+                    await bg_db.commit()
 
                 # 发送 done 信号
                 done_data: dict = {
@@ -552,8 +577,6 @@ async def stream_response(
                         "total_tokens": total_input_tokens + total_output_tokens,
                     },
                 }
-                if updated_title:
-                    done_data["title"] = updated_title
                 await queue.put(f"data: {json.dumps(done_data)}\n\n")
 
             except Exception as e:

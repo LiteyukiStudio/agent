@@ -4,7 +4,7 @@
  *
  * 用法:
  *   liteyuki-agent              交互式模式（Ink TUI）
- *   liteyuki-agent -d           后台模式（headless，适合 systemd/launchd）
+ *   liteyuki-agent -d           挂起到后台运行（headless，适合 SSH）
  *   liteyuki-agent install      安装为系统服务（macOS launchd / Linux systemd）
  *   liteyuki-agent uninstall    卸载系统服务
  *   liteyuki-agent status       查看服务运行状态
@@ -14,9 +14,9 @@
  *   liteyuki-agent help         显示帮助
  */
 import { platform, homedir, arch, release } from "node:os";
-import { existsSync, mkdirSync, writeFileSync, unlinkSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, unlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { execSync } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { t } from "./i18n/index.js";
 
 import { createRequire } from "node:module";
@@ -27,10 +27,16 @@ const args = process.argv.slice(2);
 const command = args[0];
 const flags = new Set(args.slice(1));
 const yesMode = flags.has("-y") || flags.has("--yes") || args.includes("-y") || args.includes("--yes");
+const DAEMON_FOREGROUND_COMMAND = "--daemon-foreground";
 
 switch (command) {
   case "-d":
   case "--daemon": {
+    startDetachedDaemon(yesMode);
+    break;
+  }
+
+  case DAEMON_FOREGROUND_COMMAND: {
     if (yesMode) {
       const { setAutoApprove } = await import("./connection.js");
       setAutoApprove(true);
@@ -133,6 +139,43 @@ switch (command) {
     const { App } = await import("./app.js");
     render(React.createElement(App));
     break;
+}
+
+function getDaemonLogDir(): string {
+  if (platform() === "darwin") {
+    return join(homedir(), "Library", "Logs", "liteyuki-local-agent");
+  }
+  return join(homedir(), ".local", "state", "liteyuki-local-agent");
+}
+
+function startDetachedDaemon(autoApprove: boolean): void {
+  const bin = getAgentBin();
+  const logDir = getDaemonLogDir();
+  mkdirSync(logDir, { recursive: true });
+
+  const stdoutPath = join(logDir, "daemon.log");
+  const stderrPath = join(logDir, "daemon.err.log");
+  const out = openSync(stdoutPath, "a");
+  const err = openSync(stderrPath, "a");
+
+  const childArgs = [bin, DAEMON_FOREGROUND_COMMAND];
+  if (autoApprove) {
+    childArgs.push("-y");
+  }
+
+  const child = spawn(process.execPath, childArgs, {
+    detached: true,
+    stdio: ["ignore", out, err],
+    env: process.env,
+  });
+  child.unref();
+  closeSync(out);
+  closeSync(err);
+
+  console.log(`✅ Liteyuki Local Agent 已在后台启动`);
+  console.log(`   PID:  ${child.pid}`);
+  console.log(`   Log:  ${stdoutPath}`);
+  console.log(`   Err:  ${stderrPath}`);
 }
 
 function printHelp(): void {
@@ -359,7 +402,7 @@ function installLaunchd(): void {
     <array>
         <string>${process.execPath}</string>
         <string>${bin}</string>
-        <string>-d</string>
+        <string>${DAEMON_FOREGROUND_COMMAND}</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
@@ -423,7 +466,7 @@ After=network.target
 
 [Service]
 Type=simple
-ExecStart=${process.execPath} ${bin} -d
+ExecStart=${process.execPath} ${bin} ${DAEMON_FOREGROUND_COMMAND}
 Restart=on-failure
 RestartSec=5
 Environment=PATH=/usr/local/bin:/usr/bin:/bin

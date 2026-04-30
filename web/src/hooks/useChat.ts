@@ -24,6 +24,20 @@ interface ApiMessage {
   created_at: string
 }
 
+function parseTitleToolResult(result: unknown): string | null {
+  if (typeof result !== 'string')
+    return null
+  try {
+    const parsed = JSON.parse(result) as { ok?: boolean, title?: unknown }
+    if (parsed.ok && typeof parsed.title === 'string' && parsed.title.trim())
+      return parsed.title.trim()
+  }
+  catch {
+    // ignore malformed tool result
+  }
+  return null
+}
+
 function parseApiMessages(data: ApiMessage[]): Message[] {
   return data.map((m) => {
     let toolCalls: ToolCall[] | undefined
@@ -372,7 +386,24 @@ export function useChat() {
             tc.result = event.result as string
             tc.status = 'completed'
           }
+          if (event.name === 'set_conversation_title') {
+            const newTitle = parseTitleToolResult(event.result)
+            if (newTitle) {
+              setSessions(prev => prev.map(s =>
+                s.id === sid ? { ...s, title: newTitle } : s,
+              ))
+            }
+          }
           updateAssistantMsg(assistantContent || 'Processing...')
+        }
+        else if (eventType === 'session_title_updated') {
+          const eventSessionId = typeof event.session_id === 'string' ? event.session_id : sid
+          const newTitle = typeof event.title === 'string' ? event.title.trim() : ''
+          if (newTitle) {
+            setSessions(prev => prev.map(s =>
+              s.id === eventSessionId ? { ...s, title: newTitle } : s,
+            ))
+          }
         }
         else if (eventType === 'tool_error') {
           // 工具执行出错

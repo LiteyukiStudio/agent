@@ -9,7 +9,7 @@ export default {
       flags: "选项:",
       examples: "示例:",
       cmdNone: "(无)            启动交互式 TUI 模式",
-      cmdDaemon: "-d, --daemon    后台守护进程模式（无 TUI）",
+      cmdDaemon: "-d, --daemon    挂起到后台运行（无 TUI，适合 SSH）",
       cmdInstall: "install         安装为系统服务（开机自启）",
       cmdUninstall: "uninstall       卸载系统服务",
       cmdStart: "start           启动后台服务",
