@@ -301,6 +301,7 @@ async def stream_response(
             session_id=session_id,
             role="assistant",
             content="",
+            status="generating",
         )
         db.add(assistant_msg)
         await db.commit()
@@ -310,226 +311,248 @@ async def stream_response(
     # 用 queue 做 SSE 事件缓冲；后台 task 即使前端断开也跑完
     queue: asyncio.Queue[str | None] = asyncio.Queue()
 
+    # 保存后台 task 需要的参数（避免闭包引用请求级 db）
+    _assistant_msg_id = assistant_msg.id if assistant_msg else None
+
     async def _run_llm_background() -> None:
         """后台运行 LLM 并定期 flush 到数据库。前端断开不影响此 task。"""
-        nonlocal assistant_msg
-        total_input_tokens = 0
-        total_output_tokens = 0
-        assistant_text = ""
-        collected_tool_calls: list[dict] = []
-        has_partial_text = False
-        last_flush = asyncio.get_event_loop().time()
+        from server.database import async_session_factory
 
-        async def _flush_to_db() -> None:
-            """将当前累积的内容写入数据库。"""
-            nonlocal last_flush
-            if assistant_msg and (assistant_text or collected_tool_calls):
-                tool_calls_json = json.dumps(collected_tool_calls) if collected_tool_calls else None
-                assistant_msg.content = assistant_text
-                assistant_msg.tool_calls = tool_calls_json
-                await db.commit()
+        # 使用独立的 db session，避免与请求级 session 冲突
+        async with async_session_factory() as bg_db:
+            # 重新加载 assistant_msg 到本 session
+            bg_assistant_msg: Message | None = None
+            if _assistant_msg_id:
+                result = await bg_db.execute(select(Message).where(Message.id == _assistant_msg_id))
+                bg_assistant_msg = result.scalar_one_or_none()
+
+            total_input_tokens = 0
+            total_output_tokens = 0
+            assistant_text = ""
+            collected_tool_calls: list[dict] = []
+            has_partial_text = False
             last_flush = asyncio.get_event_loop().time()
 
-        try:
-            async for event in runner.run_async(
-                user_id=user.id,
-                session_id=adk_session_id,
-                new_message=message,
-                state_delta=injected_state,
-                run_config=RunConfig(streaming_mode=StreamingMode.SSE),
-            ):
-                # 提取 token 用量
-                if hasattr(event, "usage_metadata") and event.usage_metadata:
-                    total_input_tokens += getattr(event.usage_metadata, "prompt_token_count", 0) or 0
-                    total_output_tokens += getattr(event.usage_metadata, "candidates_token_count", 0) or 0
+            async def _flush_to_db() -> None:
+                """将当前累积的内容写入数据库。"""
+                nonlocal last_flush
+                if bg_assistant_msg and (assistant_text or collected_tool_calls):
+                    tool_calls_json = json.dumps(collected_tool_calls) if collected_tool_calls else None
+                    bg_assistant_msg.content = assistant_text
+                    bg_assistant_msg.tool_calls = tool_calls_json
+                    await bg_db.commit()
+                last_flush = asyncio.get_event_loop().time()
 
-                # state 变更 → 回写凭据
-                if event.actions and event.actions.state_delta:
-                    for state_key, state_value in event.actions.state_delta.items():
+            try:
+                async for event in runner.run_async(
+                    user_id=user.id,
+                    session_id=adk_session_id,
+                    new_message=message,
+                    state_delta=injected_state,
+                    run_config=RunConfig(streaming_mode=StreamingMode.SSE),
+                ):
+                    # 提取 token 用量
+                    if hasattr(event, "usage_metadata") and event.usage_metadata:
+                        total_input_tokens += getattr(event.usage_metadata, "prompt_token_count", 0) or 0
+                        total_output_tokens += getattr(event.usage_metadata, "candidates_token_count", 0) or 0
+
+                    # state 变更 → 回写凭据
+                    if event.actions and event.actions.state_delta:
+                        for state_key, state_value in event.actions.state_delta.items():
+                            parts = state_key.split("_", 1)
+                            if len(parts) == 2 and parts[0] in PERSIST_CREDENTIAL_NAMESPACES:
+                                namespace, key = parts
+                                is_secret = key in ("token", "password", "secret")
+                                await set_config(bg_db, user.id, namespace, key, str(state_value), is_secret=is_secret)
+
+                    # 提取内容 → 放入 queue + 累积文本
+                    if event.content and event.content.parts:
+                        author = event.author or "assistant"
+                        is_partial = bool(event.partial)
+
+                        for part in event.content.parts:
+                            # ── 文本 ──
+                            if part.text:
+                                text = part.text
+                                if is_partial:
+                                    has_partial_text = True
+                                    is_thinking = bool(part.thought)
+                                    if not is_thinking:
+                                        assistant_text += text
+                                    sse_data = json.dumps(
+                                        {
+                                            "event": "thinking" if is_thinking else "text",
+                                            "author": author,
+                                            "content": text,
+                                        }
+                                    )
+                                    await queue.put(f"data: {sse_data}\n\n")
+                                elif has_partial_text:
+                                    pass  # 跳过汇总事件
+                                else:
+                                    is_thinking = bool(part.thought)
+                                    if not is_thinking:
+                                        assistant_text += text
+                                    sse_data = json.dumps(
+                                        {
+                                            "event": "thinking" if is_thinking else "text",
+                                            "author": author,
+                                            "content": text,
+                                        }
+                                    )
+                                    await queue.put(f"data: {sse_data}\n\n")
+
+                            # ── 函数调用 ──
+                            if part.function_call:
+                                tc_data = {
+                                    "name": part.function_call.name,
+                                    "args": dict(part.function_call.args) if part.function_call.args else {},
+                                }
+                                collected_tool_calls.append(tc_data)
+                                sse_data = json.dumps({"event": "tool_call", "author": author, **tc_data})
+                                await queue.put(f"data: {sse_data}\n\n")
+
+                            # ── 函数响应 ──
+                            if part.function_response:
+                                response_data = part.function_response.response
+                                result_str = str(response_data) if response_data else ""
+                                is_tool_error = isinstance(response_data, dict) and response_data.get("error") is True
+
+                                for tc in reversed(collected_tool_calls):
+                                    if tc["name"] == part.function_response.name and "result" not in tc:
+                                        tc["result"] = result_str
+                                        if is_tool_error:
+                                            tc["error"] = True
+                                        break
+
+                                if is_tool_error:
+                                    sse_data = json.dumps(
+                                        {
+                                            "event": "tool_error",
+                                            "name": part.function_response.name,
+                                            "error_type": response_data.get("error_type", "Error"),
+                                            "error_message": response_data.get("error_message", "Unknown error"),
+                                        }
+                                    )
+                                else:
+                                    sse_data = json.dumps(
+                                        {
+                                            "event": "tool_result",
+                                            "name": part.function_response.name,
+                                            "result": result_str,
+                                        }
+                                    )
+                                await queue.put(f"data: {sse_data}\n\n")
+
+                    # 定期 flush（每 _FLUSH_INTERVAL 秒）
+                    now = asyncio.get_event_loop().time()
+                    if now - last_flush >= _FLUSH_INTERVAL:
+                        await _flush_to_db()
+
+                # ─── 流正常结束：收尾工作 ───
+
+                # 兜底回写凭据
+                final_session = await session_service.get_session(
+                    app_name="liteyuki_sre",
+                    user_id=user.id,
+                    session_id=adk_session_id,
+                )
+                if final_session:
+                    for state_key, state_value in final_session.state.to_dict().items():
                         parts = state_key.split("_", 1)
-                        if len(parts) == 2 and parts[0] in PERSIST_CREDENTIAL_NAMESPACES:
+                        if len(parts) == 2 and parts[0] in PERSIST_CREDENTIAL_NAMESPACES and state_value:
                             namespace, key = parts
                             is_secret = key in ("token", "password", "secret")
-                            await set_config(db, user.id, namespace, key, str(state_value), is_secret=is_secret)
+                            await set_config(bg_db, user.id, namespace, key, str(state_value), is_secret=is_secret)
 
-                # 提取内容 → 放入 queue + 累积文本
-                if event.content and event.content.parts:
-                    author = event.author or "assistant"
-                    is_partial = bool(event.partial)
+                # 记录用量
+                if total_input_tokens > 0 or total_output_tokens > 0:
+                    await record_usage(
+                        db=bg_db,
+                        user_id=user.id,
+                        model="agent",
+                        input_tokens=total_input_tokens,
+                        output_tokens=total_output_tokens,
+                        agent_name="root_agent",
+                        session_id=session_id,
+                    )
 
-                    for part in event.content.parts:
-                        # ── 文本 ──
-                        if part.text:
-                            text = part.text
-                            if is_partial:
-                                has_partial_text = True
-                                is_thinking = bool(part.thought)
-                                if not is_thinking:
-                                    assistant_text += text
-                                sse_data = json.dumps(
-                                    {
-                                        "event": "thinking" if is_thinking else "text",
-                                        "author": author,
-                                        "content": text,
-                                    }
-                                )
-                                await queue.put(f"data: {sse_data}\n\n")
-                            elif has_partial_text:
-                                pass  # 跳过汇总事件
-                            else:
-                                is_thinking = bool(part.thought)
-                                if not is_thinking:
-                                    assistant_text += text
-                                sse_data = json.dumps(
-                                    {
-                                        "event": "thinking" if is_thinking else "text",
-                                        "author": author,
-                                        "content": text,
-                                    }
-                                )
-                                await queue.put(f"data: {sse_data}\n\n")
-
-                        # ── 函数调用 ──
-                        if part.function_call:
-                            tc_data = {
-                                "name": part.function_call.name,
-                                "args": dict(part.function_call.args) if part.function_call.args else {},
-                            }
-                            collected_tool_calls.append(tc_data)
-                            sse_data = json.dumps({"event": "tool_call", "author": author, **tc_data})
-                            await queue.put(f"data: {sse_data}\n\n")
-
-                        # ── 函数响应 ──
-                        if part.function_response:
-                            response_data = part.function_response.response
-                            result_str = str(response_data) if response_data else ""
-                            is_tool_error = isinstance(response_data, dict) and response_data.get("error") is True
-
-                            for tc in reversed(collected_tool_calls):
-                                if tc["name"] == part.function_response.name and "result" not in tc:
-                                    tc["result"] = result_str
-                                    if is_tool_error:
-                                        tc["error"] = True
-                                    break
-
-                            if is_tool_error:
-                                sse_data = json.dumps(
-                                    {
-                                        "event": "tool_error",
-                                        "name": part.function_response.name,
-                                        "error_type": response_data.get("error_type", "Error"),
-                                        "error_message": response_data.get("error_message", "Unknown error"),
-                                    }
-                                )
-                            else:
-                                sse_data = json.dumps(
-                                    {
-                                        "event": "tool_result",
-                                        "name": part.function_response.name,
-                                        "result": result_str,
-                                    }
-                                )
-                            await queue.put(f"data: {sse_data}\n\n")
-
-                # 定期 flush（每 _FLUSH_INTERVAL 秒）
-                now = asyncio.get_event_loop().time()
-                if now - last_flush >= _FLUSH_INTERVAL:
-                    await _flush_to_db()
-
-            # ─── 流正常结束：收尾工作 ───
-
-            # 兜底回写凭据
-            final_session = await session_service.get_session(
-                app_name="liteyuki_sre",
-                user_id=user.id,
-                session_id=adk_session_id,
-            )
-            if final_session:
-                for state_key, state_value in final_session.state.to_dict().items():
-                    parts = state_key.split("_", 1)
-                    if len(parts) == 2 and parts[0] in PERSIST_CREDENTIAL_NAMESPACES and state_value:
-                        namespace, key = parts
-                        is_secret = key in ("token", "password", "secret")
-                        await set_config(db, user.id, namespace, key, str(state_value), is_secret=is_secret)
-
-            # 记录用量
-            if total_input_tokens > 0 or total_output_tokens > 0:
-                await record_usage(
-                    db=db,
-                    user_id=user.id,
-                    model="agent",
-                    input_tokens=total_input_tokens,
-                    output_tokens=total_output_tokens,
-                    agent_name="root_agent",
-                    session_id=session_id,
-                )
-
-            # 最终 flush 消息到数据库
-            if assistant_msg and (assistant_text or collected_tool_calls):
-                tool_calls_json = json.dumps(collected_tool_calls) if collected_tool_calls else None
-                assistant_msg.content = assistant_text
-                assistant_msg.tool_calls = tool_calls_json
-                await db.commit()
-            elif assistant_msg and not assistant_text and not collected_tool_calls:
-                await db.delete(assistant_msg)
-                await db.commit()
-
-            # 更新会话摘要 + 自动标题
-            updated_title = None
-            if session_id:
-                result = await db.execute(select(ChatSession).where(ChatSession.id == session_id))
-                chat_session = result.scalar_one_or_none()
-                if chat_session:
-                    if assistant_text:
-                        chat_session.last_message = assistant_text[:200]
-                    if not chat_session.title_custom and content.strip():
-                        from sqlalchemy import func as sa_func
-
-                        count_result = await db.execute(
-                            select(sa_func.count())
-                            .select_from(Message)
-                            .where(Message.session_id == session_id, Message.role == "user"),
-                        )
-                        msg_count = count_result.scalar() or 0
-                        should_update = msg_count == 1 or (msg_count > 0 and msg_count % 5 == 0)
-                        if should_update:
-                            from server.services.title_gen import generate_title
-
-                            ai_title = await generate_title(content, assistant_text)
-                            if ai_title:
-                                chat_session.title = ai_title
-                                updated_title = ai_title
-                            elif chat_session.title == "New Chat":
-                                chat_session.title = "新对话"
-                    await db.commit()
-
-            # 发送 done 信号
-            done_data: dict = {
-                "event": "done",
-                "usage": {
-                    "input_tokens": total_input_tokens,
-                    "output_tokens": total_output_tokens,
-                    "total_tokens": total_input_tokens + total_output_tokens,
-                },
-            }
-            if updated_title:
-                done_data["title"] = updated_title
-            await queue.put(f"data: {json.dumps(done_data)}\n\n")
-
-        except Exception as e:
-            logger.exception("LLM background task error: user=%s session=%s", user.username, adk_session_id)
-            await queue.put(f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n")
-            # 异常时保存已累积的内容
-            if assistant_msg:
-                try:
+                # 最终 flush 消息到数据库
+                if bg_assistant_msg and (assistant_text or collected_tool_calls):
                     tool_calls_json = json.dumps(collected_tool_calls) if collected_tool_calls else None
-                    assistant_msg.content = assistant_text or "(生成中断)"
-                    assistant_msg.tool_calls = tool_calls_json
-                    await db.commit()
-                except Exception:
-                    logger.warning("Failed to flush assistant message after error")
-        finally:
-            await queue.put(None)  # 结束信号
+                    bg_assistant_msg.content = assistant_text
+                    bg_assistant_msg.tool_calls = tool_calls_json
+                    bg_assistant_msg.status = "done"
+                    await bg_db.commit()
+                elif bg_assistant_msg and not assistant_text and not collected_tool_calls:
+                    await bg_db.delete(bg_assistant_msg)
+                    await bg_db.commit()
+
+                # 更新会话摘要 + 自动标题
+                updated_title = None
+                if session_id:
+                    result = await bg_db.execute(select(ChatSession).where(ChatSession.id == session_id))
+                    chat_session = result.scalar_one_or_none()
+                    if chat_session:
+                        if assistant_text:
+                            chat_session.last_message = assistant_text[:200]
+                        if not chat_session.title_custom and content.strip():
+                            from sqlalchemy import func as sa_func
+
+                            count_result = await bg_db.execute(
+                                select(sa_func.count())
+                                .select_from(Message)
+                                .where(Message.session_id == session_id, Message.role == "user"),
+                            )
+                            msg_count = count_result.scalar() or 0
+                            # 首次对话生成标题，之后每 5 次更新一次（第1、6、11、16...次）
+                            should_update = msg_count == 1 or (msg_count > 1 and (msg_count - 1) % 5 == 0)
+                            logger.info(
+                                "Title check: session=%s msg_count=%d should_update=%s",
+                                session_id,
+                                msg_count,
+                                should_update,
+                            )
+                            if should_update:
+                                from server.services.title_gen import generate_title
+
+                                ai_title = await generate_title(content, assistant_text)
+                                logger.info("Title generated: %s (session=%s)", ai_title, session_id)
+                                if ai_title:
+                                    chat_session.title = ai_title
+                                    updated_title = ai_title
+                                elif chat_session.title == "New Chat":
+                                    chat_session.title = "新对话"
+                        await bg_db.commit()
+
+                # 发送 done 信号
+                done_data: dict = {
+                    "event": "done",
+                    "usage": {
+                        "input_tokens": total_input_tokens,
+                        "output_tokens": total_output_tokens,
+                        "total_tokens": total_input_tokens + total_output_tokens,
+                    },
+                }
+                if updated_title:
+                    done_data["title"] = updated_title
+                await queue.put(f"data: {json.dumps(done_data)}\n\n")
+
+            except Exception as e:
+                logger.exception("LLM background task error: user=%s session=%s", user.username, adk_session_id)
+                await queue.put(f"data: {json.dumps({'event': 'error', 'message': str(e)})}\n\n")
+                # 异常时保存已累积的内容
+                if bg_assistant_msg:
+                    try:
+                        tool_calls_json = json.dumps(collected_tool_calls) if collected_tool_calls else None
+                        bg_assistant_msg.content = assistant_text or "(生成中断)"
+                        bg_assistant_msg.tool_calls = tool_calls_json
+                        bg_assistant_msg.status = "done"
+                        await bg_db.commit()
+                    except Exception:
+                        logger.warning("Failed to flush assistant message after error")
+            finally:
+                await queue.put(None)  # 结束信号
 
     # 启动后台 task（前端断开不影响它继续运行）
     task = asyncio.create_task(_run_llm_background())

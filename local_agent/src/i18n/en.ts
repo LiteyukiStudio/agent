@@ -17,6 +17,7 @@ export default {
       cmdRestart: "restart         Restart the background service (useful after update)",
       cmdStatus: "status          Show service status",
       cmdSudoers: "sudoers         Generate passwordless sudo config (for common commands)",
+      cmdUpdate: "update          Update to the latest version",
       cmdInfo: "info            Show device info and config",
       cmdLogout: "logout          Clear saved credentials",
       cmdVersion: "version, -v     Show version number",
@@ -67,6 +68,18 @@ export default {
     removeHint: "To remove:",
     failed: "❌ Failed to install sudoers config.",
     ensureSudo: "Make sure you have sudo access and try again.",
+  },
+
+  // ─── Self-update ───
+  selfUpdate: {
+    checking: "Checking for updates...",
+    alreadyLatest: "✅ Already on the latest version",
+    updating: "Updating to",
+    channel: "Install channel:",
+    success: "✅ Updated successfully! Please restart the agent.",
+    restartHint: "Run: liteyuki-agent restart",
+    failed: "❌ Update failed:",
+    unknownChannel: "Unable to detect install channel. Please update manually:",
   },
 
   // ─── Connection ───

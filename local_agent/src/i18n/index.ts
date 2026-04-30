@@ -4,7 +4,7 @@
  * Locale 检测优先级：
  *   1. 环境变量 LITEYUKI_LANG（用户强制覆盖）
  *   2. 环境变量 LANG / LC_ALL / LC_MESSAGES
- *   3. Fallback: en
+ *   3. Fallback: zh-CN（默认中文）
  */
 import type enMessages from "./en.js";
 import en from "./en.js";
@@ -40,7 +40,7 @@ function detectLocale(): string {
     if (lang in locales) return lang;
   }
 
-  return "en";
+  return "zh";
 }
 
 const currentLocale = detectLocale();

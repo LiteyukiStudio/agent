@@ -1,6 +1,7 @@
 import type { Message, MessagePart, ToolCall } from '@/types/chat'
 import { ArrowLeft, Bot, MessageSquare } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useNavigate, useParams } from 'react-router'
 import { MessageBubble } from '@/components/chat/MessageBubble'
 import { Button } from '@/components/ui/button'
@@ -78,8 +79,10 @@ export function AdminUserSessionsPage() {
   const [sessions, setSessions] = useState<SessionItem[]>([])
   const [sessionData, setSessionData] = useState<SessionMessages | null>(null)
   const [loading, setLoading] = useState(true)
+  const { t } = useTranslation('admin')
+  const { t: tc } = useTranslation('chat')
 
-  useTitle(sessionData ? `Admin: ${sessionData.session.title}` : 'Admin: User Sessions')
+  useTitle(sessionData ? `Admin: ${sessionData.session.title}` : `Admin: ${t('userSessions')}`)
 
   // 加载会话列表
   useEffect(() => {
@@ -131,7 +134,7 @@ export function AdminUserSessionsPage() {
             <ArrowLeft className="size-4" />
           </Button>
           <h2 className="text-sm font-medium truncate">{sessionData.session.title}</h2>
-          <span className="ml-auto text-[10px] text-muted-foreground">只读模式</span>
+          <span className="ml-auto text-[10px] text-muted-foreground">{tc('readOnly')}</span>
         </div>
         <ScrollArea className="flex-1">
           <div className="mx-auto max-w-3xl space-y-6 p-6">
@@ -141,7 +144,7 @@ export function AdminUserSessionsPage() {
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
                 <Bot className="mb-3 size-10" />
-                <p className="text-sm">此会话没有消息</p>
+                <p className="text-sm">{tc('noMessagesInSession')}</p>
               </div>
             )}
           </div>
@@ -163,13 +166,14 @@ export function AdminUserSessionsPage() {
           <ArrowLeft className="size-4" />
         </Button>
         <h2 className="text-lg font-semibold">
-          用户会话列表
+          {t('userSessions')}
         </h2>
         <span className="text-sm text-muted-foreground">
           (
           {sessions.length}
           {' '}
-          个会话)
+          {t('sessions')}
+          )
         </span>
       </div>
 
@@ -177,7 +181,7 @@ export function AdminUserSessionsPage() {
         ? (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <MessageSquare className="mb-3 size-10" />
-              <p className="text-sm">该用户暂无会话</p>
+              <p className="text-sm">{t('noSessions')}</p>
             </div>
           )
         : (
@@ -191,10 +195,10 @@ export function AdminUserSessionsPage() {
                 >
                   <MessageSquare className="size-4 shrink-0 text-muted-foreground" />
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{s.title || '未命名会话'}</p>
+                    <p className="text-sm font-medium truncate">{s.title || t('untitledSession')}</p>
                     <p className="text-xs text-muted-foreground">
                       {s.created_at ? new Date(s.created_at).toLocaleString() : ''}
-                      {s.is_public && ' · 公开'}
+                      {s.is_public && ` · ${t('public')}`}
                     </p>
                   </div>
                 </button>

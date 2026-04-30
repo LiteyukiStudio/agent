@@ -2,12 +2,28 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 
 
-class SessionResponse(BaseModel):
+class _BaseSchema(BaseModel):
+    """带统一 datetime 序列化的基类：所有时间输出为 ISO 8601 UTC（带 Z 后缀）。"""
+
+    model_config = {"from_attributes": True}
+
+    @field_serializer("*", mode="plain")
+    @classmethod
+    def _serialize_datetime(cls, value: object) -> object:
+        if isinstance(value, datetime):
+            # 将 naive datetime（假定为 UTC）标记时区后输出
+            if value.tzinfo is None:
+                value = value.replace(tzinfo=UTC)
+            return value.strftime("%Y-%m-%dT%H:%M:%SZ")
+        return value
+
+
+class SessionResponse(_BaseSchema):
     """聊天会话摘要。"""
 
     id: str
@@ -16,8 +32,6 @@ class SessionResponse(BaseModel):
     last_message: str | None = None
     created_at: datetime
     updated_at: datetime
-
-    model_config = {"from_attributes": True}
 
 
 class SessionCreate(BaseModel):
@@ -39,7 +53,7 @@ class MessageSend(BaseModel):
     content: str
 
 
-class MessageResponse(BaseModel):
+class MessageResponse(_BaseSchema):
     """持久化的聊天消息响应。"""
 
     id: str
@@ -47,12 +61,11 @@ class MessageResponse(BaseModel):
     role: str
     content: str
     tool_calls: str | None = None
+    status: str = "done"
     created_at: datetime
 
-    model_config = {"from_attributes": True}
 
-
-class PublicSessionResponse(BaseModel):
+class PublicSessionResponse(_BaseSchema):
     """公开会话的完整数据（含消息列表）。"""
 
     id: str

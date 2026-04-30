@@ -1,6 +1,113 @@
-# 开发规范
+# 开发与贡献指南
 
-本文档是项目的编码约定，面向开发者和 AI 编码助手。只列常用规则，细节由 Ruff / ESLint 自动检查。
+本文档面向开发者和 AI 编码助手，涵盖项目架构、开发环境、编码规范。
+
+## 技术栈
+
+| 层 | 技术 |
+|------|------|
+| Agent 框架 | Google ADK |
+| 后端 | FastAPI + SQLAlchemy 2.0 async + Pydantic v2 |
+| 数据库 | SQLite（开发）/ PostgreSQL（生产） |
+| 前端 | React 19 + Vite 8 + TypeScript 6 + TailwindCSS 4 + shadcn/ui |
+| 认证 | JWT + OAuth 2.0 OIDC + API Token |
+| 部署 | Docker Compose |
+
+## 环境要求
+
+| 工具 | 版本 |
+|------|------|
+| Python | >= 3.13 |
+| uv | >= 0.6 |
+| Node.js | >= 20 |
+| pnpm | >= 10 |
+
+## 项目结构
+
+```
+adk-demo/
+├── root_agent/                 # 根调度 Agent
+│   ├── agent.py                # root_agent 定义
+│   └── agents/                 # 子 Agent（gitea/misskey/push/search）
+├── server/                     # FastAPI 后端
+│   ├── main.py                 # 应用入口
+│   ├── models/                 # ORM 模型
+│   ├── schemas/                # Pydantic 模型
+│   ├── routers/                # API 路由
+│   └── services/               # 业务逻辑层
+├── web/                        # React 前端
+├── local_agent/                # Local Agent（TypeScript CLI）
+├── docs/                       # 文档
+├── Dockerfile                  # 后端镜像
+├── web/Dockerfile              # 前端镜像
+└── docker-compose.yml          # 编排
+```
+
+## 开发命令
+
+### Python 后端
+
+| 命令 | 说明 |
+|------|------|
+| `uv run server` | 启动后端（FastAPI + uvicorn, reload 模式） |
+| `uv run dev` | 启动 Agent 交互模式（adk run） |
+| `uv run lint` | Ruff 代码检查 |
+| `uv run fmt` | Ruff 格式化 |
+| `uv run fix` | 自动修复 + 格式化 |
+| `uv run check` | CI 用：lint + format 检查 |
+
+### 前端
+
+```bash
+cd web
+pnpm install       # 安装依赖
+pnpm dev           # 开发服务器 http://localhost:5173
+pnpm build         # 生产构建
+pnpm lint          # ESLint 检查
+pnpm lint --fix    # 自动修复
+```
+
+### Local Agent
+
+```bash
+cd local_agent
+bun install        # 安装依赖
+bun run build      # 构建
+npx tsc --noEmit   # 类型检查
+```
+
+## 模型配置
+
+支持 Gemini、DeepSeek、OpenAI、Ollama 等 LLM，通过环境变量配置。
+
+优先级：`{AGENT_NAME}_MODEL` → `AGENT_MODEL` → `gemini-2.5-flash`
+
+```env
+# 全局用 DeepSeek
+AGENT_MODEL=deepseek/deepseek-v4-flash
+AGENT_TOKEN=sk-xxx
+AGENT_API=https://api.deepseek.com
+
+# root_agent 单独用 Gemini
+ROOT_AGENT_MODEL=gemini-2.5-flash
+```
+
+## 全局约定
+
+### 时间格式
+
+**全局统一 ISO 8601 UTC（带 Z 后缀）。** 后端 API 返回的所有时间字段格式为 `2026-05-01T03:00:00Z`，前端负责转换为用户本地时区显示。
+
+### 国际化（i18n）
+
+**所有面向用户的文本必须走 i18n，禁止硬编码。**
+
+- 前端：`useTranslation('namespace')` + `locales/{zh,en,ja}/module.json`
+- Local Agent：`src/i18n/` 目录，`t.xxx.yyy` 访问
+
+---
+
+## 编码规范
 
 ## 开发环境设置
 

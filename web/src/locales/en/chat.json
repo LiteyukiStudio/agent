@@ -6,6 +6,9 @@
   "noMessages": "Send a message to start the conversation",
   "selectSession": "Select a session or create a new one to get started",
   "noSessionMessages": "No messages",
+  "publicSession": "Public session",
+  "readOnly": "Read-only",
+  "noMessagesInSession": "This session has no messages",
   "toolCall": "Tool call",
   "thinking": "Thinking...",
   "toolStatus": {

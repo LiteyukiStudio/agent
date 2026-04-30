@@ -17,6 +17,7 @@ export default {
       cmdRestart: "restart         重启后台服务（更新后使用）",
       cmdStatus: "status          查看服务状态",
       cmdSudoers: "sudoers         生成免密 sudo 配置（常用命令）",
+      cmdUpdate: "update          更新到最新版本",
       cmdInfo: "info            显示设备信息和配置",
       cmdLogout: "logout          清除已保存的凭据",
       cmdVersion: "version, -v     显示版本号",
@@ -67,6 +68,18 @@ export default {
     removeHint: "删除方式:",
     failed: "❌ Sudoers 配置安装失败。",
     ensureSudo: "请确保你有 sudo 权限后重试。",
+  },
+
+  // ─── 自更新 ───
+  selfUpdate: {
+    checking: "正在检查更新...",
+    alreadyLatest: "✅ 已是最新版本",
+    updating: "正在更新到",
+    channel: "安装渠道:",
+    success: "✅ 更新成功！请重启 agent。",
+    restartHint: "运行: liteyuki-agent restart",
+    failed: "❌ 更新失败:",
+    unknownChannel: "无法检测安装渠道，请手动更新:",
   },
 
   // ─── 连接 ───

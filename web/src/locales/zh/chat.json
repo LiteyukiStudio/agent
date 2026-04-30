@@ -6,6 +6,9 @@
   "noMessages": "发送一条消息开始对话",
   "selectSession": "选择一个会话或创建新会话以开始",
   "noSessionMessages": "暂无消息",
+  "publicSession": "公开会话",
+  "readOnly": "只读模式",
+  "noMessagesInSession": "此会话没有消息",
   "toolCall": "工具调用",
   "thinking": "思考中...",
   "toolStatus": {

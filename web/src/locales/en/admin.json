@@ -31,5 +31,10 @@
   "rpm": "RPM",
   "default": "Default",
   "setDefault": "Set default",
-  "noPlans": "No quota plans yet."
+  "noPlans": "No quota plans yet.",
+  "userSessions": "User Sessions",
+  "sessions": "Sessions",
+  "noSessions": "No sessions for this user",
+  "untitledSession": "Untitled Session",
+  "public": "Public"
 }

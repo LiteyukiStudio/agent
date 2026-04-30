@@ -144,7 +144,7 @@ export function App() {
     setIsLoggingIn(false);
   }
 
-  function handleSubmit(value: string) {
+  async function handleSubmit(value: string) {
     setInput("");
     const trimmed = value.trim();
     if (!trimmed) return;
@@ -231,12 +231,47 @@ export function App() {
           addLog("info", "  /connect <url> <token>  Connect with base URL + token");
           addLog("info", "  /disconnect             Disconnect from server");
           addLog("info", "  /status                 Show connection info");
+          addLog("info", "  /update                 Check and install updates");
           addLog("info", "  /yes                    Auto-approve all commands (skip confirmation)");
           addLog("info", "  /no                     Require confirmation for dangerous commands");
           addLog("info", "  /logout                 Clear saved credentials");
           addLog("info", "  /clear                  Clear log output");
           addLog("info", "  /quit                   Exit");
           break;
+
+        case "/update": {
+          addLog("info", "Checking for updates...");
+          const { checkUpdate } = await import("./update.js");
+          const updateInfo = await checkUpdate(VERSION);
+          if (!updateInfo) {
+            addLog("info", `✅ Already on the latest version (v${VERSION})`);
+          } else {
+            addLog("warn", `New version available: v${VERSION} → v${updateInfo.latest}`);
+            addLog("info", "Updating...");
+            const { execSync: execSyncUpdate } = await import("node:child_process");
+            // 检测安装渠道
+            const binPath = process.argv[1] || "";
+            let updateCmd: string;
+            if (binPath.includes("pnpm")) {
+              updateCmd = `pnpm add -g liteyuki-local-agent@${updateInfo.latest}`;
+            } else if (binPath.includes("node_modules")) {
+              updateCmd = `npm install -g liteyuki-local-agent@${updateInfo.latest}`;
+            } else {
+              addLog("warn", "Cannot auto-update binary install. Please download from:");
+              addLog("warn", "  https://github.com/LiteyukiStudio/agent/releases");
+              break;
+            }
+            addLog("info", `  $ ${updateCmd}`);
+            try {
+              execSyncUpdate(updateCmd, { stdio: "pipe", encoding: "utf-8" });
+              addLog("info", "✅ Updated! Please restart: liteyuki-agent restart");
+            } catch (err) {
+              const errMsg = err instanceof Error ? err.message : String(err);
+              addLog("error", `Update failed: ${errMsg.slice(0, 200)}`);
+            }
+          }
+          break;
+        }
 
         default:
           addLog("error", `Unknown command: ${cmd}. Type /help`);

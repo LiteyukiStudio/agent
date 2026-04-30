@@ -26,5 +26,6 @@ class Message(Base):
     role: Mapped[str] = mapped_column(String(20), nullable=False)  # 'user' 或 'assistant'
     content: Mapped[str] = mapped_column(Text, nullable=False)
     tool_calls: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON 字符串
+    status: Mapped[str] = mapped_column(String(20), default="done")  # 'generating' 或 'done'
 
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())

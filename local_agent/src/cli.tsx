@@ -68,6 +68,10 @@ switch (command) {
     setupSudoers();
     break;
 
+  case "update":
+    await runUpdate();
+    break;
+
   case "version":
   case "-v":
   case "--version":
@@ -148,6 +152,7 @@ ${h.commands}
   ${h.cmdRestart}
   ${h.cmdStatus}
   ${h.cmdSudoers}
+  ${h.cmdUpdate}
   ${h.cmdInfo}
   ${h.cmdLogout}
   ${h.cmdVersion}
@@ -516,5 +521,85 @@ function setupSudoers(): void {
     if (e instanceof Error) {
       console.error(`   Error: ${e.message}`);
     }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// 自更新
+// ---------------------------------------------------------------------------
+
+type InstallChannel = "npm" | "pnpm" | "binary" | "unknown";
+
+function detectInstallChannel(): InstallChannel {
+  const binPath = process.argv[1] || "";
+  // pnpm 全局安装路径通常含 pnpm
+  if (binPath.includes("pnpm")) return "pnpm";
+  // npm 全局安装路径含 node_modules
+  if (binPath.includes("node_modules")) return "npm";
+  // 如果不含 node_modules，可能是 bun 编译的二进制
+  // 但也可能是 npx 等临时路径，检查是否有 npm/pnpm 可用
+  try {
+    execSync("pnpm --version", { stdio: "pipe" });
+    // 如果 pnpm 存在且 binPath 不含 node_modules → 二进制
+    if (!binPath.includes("node_modules")) return "binary";
+    return "pnpm";
+  } catch {
+    try {
+      execSync("npm --version", { stdio: "pipe" });
+      if (!binPath.includes("node_modules")) return "binary";
+      return "npm";
+    } catch {
+      return "binary";
+    }
+  }
+}
+
+async function runUpdate(): Promise<void> {
+  const { checkUpdate } = await import("./update.js");
+
+  console.log(t.selfUpdate.checking);
+
+  const update = await checkUpdate(pkg.version);
+  if (!update) {
+    console.log(`${t.selfUpdate.alreadyLatest} (v${pkg.version})`);
+    return;
+  }
+
+  const channel = detectInstallChannel();
+  console.log(`${t.selfUpdate.updating} v${update.latest}...`);
+  console.log(`${t.selfUpdate.channel} ${channel}`);
+
+  let cmd: string;
+  switch (channel) {
+    case "npm":
+      cmd = `npm install -g liteyuki-local-agent@${update.latest}`;
+      break;
+    case "pnpm":
+      cmd = `pnpm add -g liteyuki-local-agent@${update.latest}`;
+      break;
+    case "binary":
+      // 二进制暂不支持自动更新，提示手动下载
+      console.log(t.selfUpdate.unknownChannel);
+      for (const c of update.commands) {
+        console.log(`  ${c}`);
+      }
+      console.log(`  https://github.com/LiteyukiStudio/agent/releases`);
+      return;
+    default:
+      console.log(t.selfUpdate.unknownChannel);
+      for (const c of update.commands) {
+        console.log(`  ${c}`);
+      }
+      return;
+  }
+
+  try {
+    console.log(`  $ ${cmd}`);
+    execSync(cmd, { stdio: "inherit" });
+    console.log(t.selfUpdate.success);
+    console.log(`  ${t.selfUpdate.restartHint}`);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error(`${t.selfUpdate.failed} ${msg}`);
   }
 }

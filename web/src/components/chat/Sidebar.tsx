@@ -259,7 +259,9 @@ export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession,
                     <span className="flex w-full items-center gap-1.5 font-medium text-sidebar-foreground">
                       <span className="truncate">{session.title}</span>
                       {session.isPublic && (
-                        <Globe className="size-3.5 shrink-0 text-muted-foreground" title="公开会话" />
+                        <span title={t('publicSession')}>
+                          <Globe className="size-3.5 shrink-0 text-muted-foreground" />
+                        </span>
                       )}
                       {isLoading && activeSessionId === session.id && (
                         <Loader2 className="size-3.5 shrink-0 animate-spin text-muted-foreground" />

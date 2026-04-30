@@ -31,5 +31,10 @@
   "rpm": "每分钟请求",
   "default": "默认",
   "setDefault": "设为默认",
-  "noPlans": "暂无配额方案。"
+  "noPlans": "暂无配额方案。",
+  "userSessions": "用户会话列表",
+  "sessions": "会话",
+  "noSessions": "该用户暂无会话",
+  "untitledSession": "未命名会话",
+  "public": "公开"
 }

@@ -19,22 +19,33 @@ interface ApiMessage {
   role: 'user' | 'assistant'
   content: string
   tool_calls: string | null
+  status?: string
   created_at: string
 }
 
 function parseApiMessages(data: ApiMessage[]): Message[] {
   return data.map((m) => {
     let toolCalls: ToolCall[] | undefined
+    let parts: MessagePart[] | undefined
+
     if (m.tool_calls) {
       try {
-        const parsed = JSON.parse(m.tool_calls) as Array<{ name: string, args?: Record<string, unknown>, result?: string }>
+        const parsed = JSON.parse(m.tool_calls) as Array<{ name: string, args?: Record<string, unknown>, result?: string, error?: boolean }>
         toolCalls = parsed.map((tc, i) => ({
           id: `tc-${i}`,
           name: tc.name,
           args: tc.args || {},
           result: tc.result,
-          status: 'completed' as const,
+          status: tc.error ? 'error' as const : 'completed' as const,
         }))
+        // 构建 parts：文本 + 工具调用交错排列
+        parts = []
+        if (m.content) {
+          parts.push({ type: 'text', content: m.content })
+        }
+        for (const tc of toolCalls) {
+          parts.push({ type: 'tool_call', toolCall: tc })
+        }
       }
       catch {
         // ignore parse error
@@ -46,7 +57,9 @@ function parseApiMessages(data: ApiMessage[]): Message[] {
       content: m.content,
       timestamp: new Date(m.created_at),
       toolCalls,
-    }
+      parts,
+      status: m.status,
+    } as Message & { status?: string }
   })
 }
 
@@ -103,6 +116,55 @@ export function useChat() {
       loadMessages(activeSessionId)
     }
   }, [activeSessionId, loadMessages])
+
+  // 轮询：如果最后一条 assistant 消息还在 generating，每 2 秒刷新
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  useEffect(() => {
+    // 清理之前的轮询
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current)
+      pollingRef.current = null
+    }
+    if (!activeSessionId)
+      return
+
+    const messages = messagesBySession[activeSessionId]
+    if (!messages || messages.length === 0)
+      return
+
+    // 检查后端返回的最后一条 assistant 是否在 generating
+    const lastAssistant = [...messages].reverse().find(m => m.role === 'assistant')
+    if (!lastAssistant || (lastAssistant as { status?: string }).status !== 'generating')
+      return
+
+    // 启动轮询
+    pollingRef.current = setInterval(async () => {
+      try {
+        const data = await apiGet<ApiMessage[]>(`/api/v1/chat/sessions/${activeSessionId}/messages`)
+        const updated = parseApiMessages(data)
+        setMessagesBySession(prev => ({ ...prev, [activeSessionId]: updated }))
+
+        // 检查是否已完成
+        const lastMsg = [...data].reverse().find(m => m.role === 'assistant')
+        if (!lastMsg || lastMsg.status !== 'generating') {
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current)
+            pollingRef.current = null
+          }
+        }
+      }
+      catch {
+        // 轮询失败不处理
+      }
+    }, 2000)
+
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current)
+        pollingRef.current = null
+      }
+    }
+  }, [activeSessionId, messagesBySession])
 
   const activeSession = sessions.find(s => s.id === activeSessionId) ?? null
   const activeMessages = activeSessionId ? (messagesBySession[activeSessionId] || []) : []
@@ -216,7 +278,13 @@ export function useChat() {
         thinking: thinkingContent || undefined,
         timestamp: new Date(),
         toolCalls: toolCalls.length > 0 ? toolCalls.map(tc => ({ ...tc })) : undefined,
-        parts: parts.length > 0 ? parts.map(p => p.type === 'text' ? { ...p } : { ...p, toolCall: { ...p.toolCall } }) : undefined,
+        parts: parts.length > 0
+          ? parts.map((p) => {
+              if (p.type === 'text' || p.type === 'thinking')
+                return { ...p }
+              return { ...p, toolCall: { ...p.toolCall } }
+            })
+          : undefined,
       }
     }
 

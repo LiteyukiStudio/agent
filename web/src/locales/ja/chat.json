@@ -6,6 +6,9 @@
   "noMessages": "メッセージを送信して会話を始めましょう",
   "selectSession": "セッションを選択するか、新しいセッションを作成してください",
   "noSessionMessages": "メッセージなし",
+  "publicSession": "公開セッション",
+  "readOnly": "読み取り専用",
+  "noMessagesInSession": "このセッションにはメッセージがありません",
   "toolCall": "ツール呼び出し",
   "thinking": "考え中...",
   "toolStatus": {
