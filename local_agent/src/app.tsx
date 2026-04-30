@@ -7,6 +7,7 @@ import TextInput from "ink-text-input";
 import {
   connect,
   disconnect,
+  setAutoApprove,
   setEvents,
   type ConnectionStatus,
 } from "./connection.js";
@@ -224,6 +225,20 @@ export function App() {
           exit();
           break;
 
+        case "/yes":
+        case "/auto-approve": {
+          setAutoApprove(true);
+          addLog("success", "Auto-approve enabled. All commands will execute without confirmation.");
+          break;
+        }
+
+        case "/no":
+        case "/manual-approve": {
+          setAutoApprove(false);
+          addLog("info", "Auto-approve disabled. Dangerous commands require confirmation.");
+          break;
+        }
+
         case "/help":
           addLog("info", "Commands:");
           addLog("info", "  /login [url]            Login via browser (default: flow.liteyuki.org)");
@@ -231,6 +246,8 @@ export function App() {
           addLog("info", "  /connect <url> <token>  Connect with base URL + token");
           addLog("info", "  /disconnect             Disconnect from server");
           addLog("info", "  /status                 Show connection info");
+          addLog("info", "  /yes                    Auto-approve all commands (skip confirmation)");
+          addLog("info", "  /no                     Require confirmation for dangerous commands");
           addLog("info", "  /logout                 Clear saved credentials");
           addLog("info", "  /clear                  Clear log output");
           addLog("info", "  /quit                   Exit");

@@ -221,10 +221,16 @@ function OptionsBlock({ question, options, mode = 'single', icons, onSend }: {
 export function MessageBubble({ message, onRegenerate, onResend, onSend }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const { user } = useAuth()
+  const [showActions, setShowActions] = useState(false)
 
   function handleCopy() {
     navigator.clipboard.writeText(message.content)
     toast.success('Copied')
+  }
+
+  function handleTap() {
+    // 移动端点击消息切换按钮显示
+    setShowActions(prev => !prev)
   }
 
   return (
@@ -236,7 +242,10 @@ export function MessageBubble({ message, onRegenerate, onResend, onSend }: Messa
         </AvatarFallback>
       </Avatar>
 
-      <div className={`min-w-0 max-w-[75%] space-y-1 ${isUser ? 'items-end' : ''}`}>
+      <div
+        className={`min-w-0 max-w-[75%] space-y-1 ${isUser ? 'items-end' : ''}`}
+        onClick={handleTap}
+      >
         <div
           className={`inline-block rounded-2xl px-4 py-2.5 text-sm leading-relaxed max-w-full overflow-hidden text-left ${
             isUser
@@ -290,12 +299,12 @@ export function MessageBubble({ message, onRegenerate, onResend, onSend }: Messa
           <span className="text-[11px] text-muted-foreground">
             {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
           </span>
-          <div className="flex gap-0.5 opacity-0 transition-opacity group-hover/msg:opacity-100">
+          <div className={`flex gap-0.5 transition-opacity ${showActions ? 'opacity-100' : 'opacity-0 group-hover/msg:opacity-100'}`}>
             <Button
               variant="ghost"
               size="icon"
               className="size-6 text-muted-foreground hover:text-foreground"
-              onClick={handleCopy}
+              onClick={(e) => { e.stopPropagation(); handleCopy() }}
             >
               <ClipboardCopy className="size-3" />
             </Button>
@@ -304,7 +313,7 @@ export function MessageBubble({ message, onRegenerate, onResend, onSend }: Messa
                 variant="ghost"
                 size="icon"
                 className="size-6 text-muted-foreground hover:text-foreground"
-                onClick={() => onResend(message.content)}
+                onClick={(e) => { e.stopPropagation(); onResend(message.content) }}
               >
                 <RefreshCw className="size-3" />
               </Button>
@@ -314,7 +323,7 @@ export function MessageBubble({ message, onRegenerate, onResend, onSend }: Messa
                 variant="ghost"
                 size="icon"
                 className="size-6 text-muted-foreground hover:text-foreground"
-                onClick={onRegenerate}
+                onClick={(e) => { e.stopPropagation(); onRegenerate() }}
               >
                 <RefreshCw className="size-3" />
               </Button>

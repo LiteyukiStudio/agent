@@ -64,6 +64,10 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
   const { cleanResult, device } = parseDeviceInfo(toolCall.result)
   const isLocalTool = LOCAL_TOOLS.has(toolCall.name)
 
+  // 设备名称：优先从结果中解析，running 时 fallback 到 args.device
+  const deviceLabel = device?.device_name || (isLocalTool && toolCall.args.device as string) || null
+  const deviceOs = device?.os_type || null
+
   return (
     <div className="my-1.5">
       <button
@@ -78,10 +82,10 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
           {toolCall.status}
         </Badge>
         {/* 设备标识 */}
-        {isLocalTool && device && (
+        {isLocalTool && deviceLabel && (
           <span className="ml-1.5 inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-            <OsIcon os={device.os_type} className="size-2.5" />
-            {device.device_name}
+            {deviceOs ? <OsIcon os={deviceOs} className="size-2.5" /> : <Monitor className="size-2.5" />}
+            {deviceLabel}
           </span>
         )}
       </button>

@@ -183,15 +183,15 @@ export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession,
                   )}
               <span className="flex w-full items-center justify-between text-xs text-muted-foreground">
                 <span className="max-w-[140px] truncate">{session.lastMessage || t('noSessionMessages')}</span>
-                {/* 正常显示时间，悬浮时显示三点菜单 */}
+                {/* 桌面端 hover 显示，移动端始终显示 */}
                 <span className="relative ml-2 shrink-0">
-                  <span className="transition-opacity group-hover:opacity-0">{formatRelativeTime(session.updatedAt)}</span>
+                  <span className="transition-opacity group-hover:opacity-0 max-sm:hidden">{formatRelativeTime(session.updatedAt)}</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger
                       render={
                         <button
                           type="button"
-                          className="absolute inset-0 flex items-center justify-center rounded opacity-0 transition-opacity hover:bg-muted group-hover:opacity-100"
+                          className="absolute inset-0 flex items-center justify-center rounded transition-opacity hover:bg-muted opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
                           onClick={e => e.stopPropagation()}
                         >
                           <Ellipsis className="size-3.5" />
