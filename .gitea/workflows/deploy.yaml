@@ -26,6 +26,11 @@ concurrency:
 env:
   REGISTRY: git.liteyuki.org
   REGISTRY_USER: snowykami
+  # 内网基础镜像（reg.liteyuki.org/base/ 命名空间）
+  BASE_PYTHON: reg.liteyuki.org/base/python:3.13-slim
+  BASE_UV: reg.liteyuki.org/base/astral-uv:latest
+  BASE_NODE: reg.liteyuki.org/base/node:22-alpine
+  BASE_NGINX: reg.liteyuki.org/base/nginx:alpine
   BACKEND_TAG: git.liteyuki.org/liteyuki-docker/liteyuki-agent-backend:latest
   FRONTEND_TAG: git.liteyuki.org/liteyuki-docker/liteyuki-agent-frontend:latest
   BACKEND_NAME: liteyuki-agent-backend
@@ -64,6 +69,9 @@ jobs:
           context: .
           push: true
           tags: ${{ env.BACKEND_TAG }}
+          build-args: |
+            BASE_PYTHON=${{ env.BASE_PYTHON }}
+            BASE_UV=${{ env.BASE_UV }}
 
       - name: Deploy backend container
         run: |
@@ -103,6 +111,9 @@ jobs:
           file: web/Dockerfile
           push: true
           tags: ${{ env.FRONTEND_TAG }}
+          build-args: |
+            BASE_NODE=${{ env.BASE_NODE }}
+            BASE_NGINX=${{ env.BASE_NGINX }}
 
       - name: Deploy frontend container
         run: |

@@ -1,8 +1,12 @@
 # ---- 后端 Dockerfile ----
-FROM python:3.13-slim AS base
+ARG BASE_PYTHON=python:3.13-slim
+ARG BASE_UV=ghcr.io/astral-sh/uv:latest
+
+FROM ${BASE_UV} AS uv
+FROM ${BASE_PYTHON} AS base
 
 # 安装 uv
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+COPY --from=uv /uv /usr/local/bin/uv
 
 WORKDIR /app
 

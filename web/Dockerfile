@@ -1,7 +1,9 @@
 # ---- 前端 Dockerfile（多阶段构建）----
+ARG BASE_NODE=node:22-alpine
+ARG BASE_NGINX=nginx:alpine
 
 # 阶段 1：构建
-FROM node:22-alpine AS builder
+FROM ${BASE_NODE} AS builder
 
 RUN corepack enable pnpm
 
@@ -18,7 +20,7 @@ COPY web/ ./
 RUN pnpm build
 
 # 阶段 2：运行（Nginx 托管静态文件）
-FROM nginx:alpine
+FROM ${BASE_NGINX}
 
 # 复制构建产物
 COPY --from=builder /app/dist /usr/share/nginx/html
