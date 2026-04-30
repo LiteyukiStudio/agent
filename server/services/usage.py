@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 from sqlalchemy import func, select
@@ -26,21 +26,21 @@ logger = logging.getLogger(__name__)
 
 
 def _today_start() -> datetime:
-    """获取今天 00:00:00 UTC。"""
-    now = datetime.now(tz=UTC)
+    """获取今天 00:00:00 UTC（naive，匹配数据库 TIMESTAMP WITHOUT TIME ZONE）。"""
+    now = datetime.utcnow()
     return now.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 def _week_start() -> datetime:
-    """获取本周一 00:00:00 UTC。"""
-    now = datetime.now(tz=UTC)
+    """获取本周一 00:00:00 UTC（naive）。"""
+    now = datetime.utcnow()
     monday = now - timedelta(days=now.weekday())
     return monday.replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 def _month_start() -> datetime:
-    """获取本月 1 日 00:00:00 UTC。"""
-    now = datetime.now(tz=UTC)
+    """获取本月 1 日 00:00:00 UTC（naive）。"""
+    now = datetime.utcnow()
     return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
