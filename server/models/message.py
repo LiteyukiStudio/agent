@@ -25,6 +25,7 @@ class Message(Base):
     )
     role: Mapped[str] = mapped_column(String(20), nullable=False)  # 'user' 或 'assistant'
     content: Mapped[str] = mapped_column(Text, nullable=False)
+    thinking: Mapped[str | None] = mapped_column(Text, nullable=True)  # thinking/推理过程
     tool_calls: Mapped[str | None] = mapped_column(Text, nullable=True)  # JSON 字符串
     status: Mapped[str] = mapped_column(String(20), default="done")  # 'generating' 或 'done'
 

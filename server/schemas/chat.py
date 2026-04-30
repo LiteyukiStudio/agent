@@ -60,6 +60,7 @@ class MessageResponse(_BaseSchema):
     session_id: str
     role: str
     content: str
+    thinking: str | None = None
     tool_calls: str | None = None
     status: str = "done"
     created_at: datetime

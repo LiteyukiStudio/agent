@@ -18,6 +18,7 @@ interface ApiMessage {
   session_id: string
   role: 'user' | 'assistant'
   content: string
+  thinking: string | null
   tool_calls: string | null
   status?: string
   created_at: string
@@ -28,23 +29,40 @@ function parseApiMessages(data: ApiMessage[]): Message[] {
     let toolCalls: ToolCall[] | undefined
     let parts: MessagePart[] | undefined
 
-    if (m.tool_calls) {
+    if (m.tool_calls || m.thinking) {
       try {
-        const parsed = JSON.parse(m.tool_calls) as Array<{ name: string, args?: Record<string, unknown>, result?: string, error?: boolean }>
-        toolCalls = parsed.map((tc, i) => ({
-          id: `tc-${i}`,
-          name: tc.name,
-          args: tc.args || {},
-          result: tc.result,
-          status: tc.error ? 'error' as const : 'completed' as const,
-        }))
-        // 构建 parts：文本 + 工具调用交错排列
         parts = []
+
+        // thinking 放在最前面
+        if (m.thinking) {
+          parts.push({ type: 'thinking', content: m.thinking })
+        }
+
+        // 文本内容
         if (m.content) {
           parts.push({ type: 'text', content: m.content })
         }
-        for (const tc of toolCalls) {
-          parts.push({ type: 'tool_call', toolCall: tc })
+
+        // 工具调用
+        if (m.tool_calls) {
+          const parsed = JSON.parse(m.tool_calls) as Array<{ name: string, args?: Record<string, unknown>, result?: string, error?: boolean }>
+          toolCalls = parsed.map((tc, i) => ({
+            id: `tc-${i}`,
+            name: tc.name,
+            args: tc.args || {},
+            result: tc.result,
+            status: tc.error ? 'error' as const : 'completed' as const,
+          }))
+
+          for (const tc of toolCalls) {
+            // present_options 识别为 options 类型
+            if (tc.name === 'present_options' && tc.args.options) {
+              parts.push({ type: 'options', toolCall: tc })
+            }
+            else {
+              parts.push({ type: 'tool_call', toolCall: tc })
+            }
+          }
         }
       }
       catch {
@@ -55,6 +73,7 @@ function parseApiMessages(data: ApiMessage[]): Message[] {
       id: m.id,
       role: m.role,
       content: m.content,
+      thinking: m.thinking || undefined,
       timestamp: new Date(m.created_at),
       toolCalls,
       parts,

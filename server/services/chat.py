@@ -329,6 +329,7 @@ async def stream_response(
             total_input_tokens = 0
             total_output_tokens = 0
             assistant_text = ""
+            thinking_text = ""
             collected_tool_calls: list[dict] = []
             has_partial_text = False
             last_flush = asyncio.get_event_loop().time()
@@ -336,9 +337,10 @@ async def stream_response(
             async def _flush_to_db() -> None:
                 """将当前累积的内容写入数据库。"""
                 nonlocal last_flush
-                if bg_assistant_msg and (assistant_text or collected_tool_calls):
+                if bg_assistant_msg and (assistant_text or collected_tool_calls or thinking_text):
                     tool_calls_json = json.dumps(collected_tool_calls) if collected_tool_calls else None
                     bg_assistant_msg.content = assistant_text
+                    bg_assistant_msg.thinking = thinking_text or None
                     bg_assistant_msg.tool_calls = tool_calls_json
                     await bg_db.commit()
                 last_flush = asyncio.get_event_loop().time()
@@ -377,7 +379,9 @@ async def stream_response(
                                 if is_partial:
                                     has_partial_text = True
                                     is_thinking = bool(part.thought)
-                                    if not is_thinking:
+                                    if is_thinking:
+                                        thinking_text += text
+                                    else:
                                         assistant_text += text
                                     sse_data = json.dumps(
                                         {
@@ -391,7 +395,9 @@ async def stream_response(
                                     pass  # 跳过汇总事件
                                 else:
                                     is_thinking = bool(part.thought)
-                                    if not is_thinking:
+                                    if is_thinking:
+                                        thinking_text += text
+                                    else:
                                         assistant_text += text
                                     sse_data = json.dumps(
                                         {
@@ -478,9 +484,10 @@ async def stream_response(
                     )
 
                 # 最终 flush 消息到数据库
-                if bg_assistant_msg and (assistant_text or collected_tool_calls):
+                if bg_assistant_msg and (assistant_text or collected_tool_calls or thinking_text):
                     tool_calls_json = json.dumps(collected_tool_calls) if collected_tool_calls else None
                     bg_assistant_msg.content = assistant_text
+                    bg_assistant_msg.thinking = thinking_text or None
                     bg_assistant_msg.tool_calls = tool_calls_json
                     bg_assistant_msg.status = "done"
                     await bg_db.commit()
