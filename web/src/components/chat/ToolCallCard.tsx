@@ -69,41 +69,41 @@ export function ToolCallCard({ toolCall }: ToolCallCardProps) {
   const deviceOs = device?.os_type || null
 
   return (
-    <div className="my-1.5">
+    <div className="my-1.5 max-w-full overflow-hidden">
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-colors hover:bg-accent ${expanded ? 'bg-accent' : ''}`}
+        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs transition-colors hover:bg-accent max-w-full overflow-hidden ${expanded ? 'bg-accent' : ''}`}
       >
-        {expanded ? <ChevronDown className="size-3" /> : <ChevronRight className="size-3" />}
-        <Wrench className="size-3 text-muted-foreground" />
-        <span className="font-medium">{toolCall.name}</span>
-        <Badge variant="secondary" className={`ml-1 text-[10px] px-1.5 py-0 ${statusColor[toolCall.status]}`}>
+        {expanded ? <ChevronDown className="size-3 shrink-0" /> : <ChevronRight className="size-3 shrink-0" />}
+        <Wrench className="size-3 shrink-0 text-muted-foreground" />
+        <span className="font-medium truncate">{toolCall.name}</span>
+        <Badge variant="secondary" className={`ml-1 text-[10px] px-1.5 py-0 shrink-0 ${statusColor[toolCall.status]}`}>
           {toolCall.status}
         </Badge>
         {/* 设备标识 */}
         {isLocalTool && deviceLabel && (
-          <span className="ml-1.5 inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-            {deviceOs ? <OsIcon os={deviceOs} className="size-2.5" /> : <Monitor className="size-2.5" />}
-            {deviceLabel}
+          <span className="ml-1.5 inline-flex items-center gap-1 rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground shrink-0 max-w-[120px]">
+            {deviceOs ? <OsIcon os={deviceOs} className="size-2.5 shrink-0" /> : <Monitor className="size-2.5 shrink-0" />}
+            <span className="truncate">{deviceLabel}</span>
           </span>
         )}
       </button>
 
       {expanded && (
-        <div className="mt-1.5 ml-5 space-y-2 rounded-lg border bg-muted/50 p-3 text-xs">
+        <div className="mt-1.5 ml-5 space-y-2 rounded-lg border bg-muted/50 p-3 text-xs max-w-full overflow-hidden">
           {Object.keys(toolCall.args).length > 0 && (
-            <div>
+            <div className="overflow-hidden">
               <p className="mb-1 font-medium text-muted-foreground">Arguments</p>
-              <pre className="overflow-x-auto rounded bg-background p-2 text-[11px] leading-relaxed">
+              <pre className="overflow-x-auto rounded bg-background p-2 text-[11px] leading-relaxed max-w-full">
                 {JSON.stringify(toolCall.args, null, 2)}
               </pre>
             </div>
           )}
           {cleanResult && (
-            <div>
+            <div className="overflow-hidden">
               <p className="mb-1 font-medium text-muted-foreground">Result</p>
-              <pre className="overflow-x-auto rounded bg-background p-2 text-[11px] leading-relaxed max-h-48">
+              <pre className="overflow-x-auto rounded bg-background p-2 text-[11px] leading-relaxed max-h-48 max-w-full">
                 {cleanResult}
               </pre>
             </div>

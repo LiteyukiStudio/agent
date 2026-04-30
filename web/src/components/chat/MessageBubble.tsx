@@ -44,7 +44,7 @@ function ThinkingBlock({ content }: { content: string }) {
   )
 }
 
-const markdownClasses = 'prose prose-sm dark:prose-invert max-w-none break-words overflow-hidden [&_table]:text-xs [&_table]:w-full [&_table]:border-collapse [&_table]:block [&_table]:overflow-x-auto [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_pre]:bg-background [&_pre]:text-xs [&_pre]:overflow-x-auto [&_code]:text-xs [&_code]:break-all [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_table]:my-2'
+const markdownClasses = 'prose prose-sm dark:prose-invert max-w-none break-words overflow-hidden [&_table]:text-xs [&_table]:w-full [&_table]:border-collapse [&_table]:block [&_table]:overflow-x-auto [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_pre]:bg-background [&_pre]:text-xs [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:text-xs [&_code]:break-all [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_table]:my-2'
 
 // External links: primary color + icon + new tab; internal links: default
 function MarkdownLink({ href, children, ...props }: ComponentPropsWithoutRef<'a'>) {
@@ -124,9 +124,9 @@ function OptionsBlock({ question, options, mode = 'single', icons, onSend }: {
   }
 
   return (
-    <div className="my-2 space-y-2">
+    <div className="my-2 space-y-2 max-w-full overflow-hidden">
       {question && (
-        <p className="text-sm text-muted-foreground">{question}</p>
+        <p className="text-sm text-muted-foreground break-words">{question}</p>
       )}
 
       {/* 选项按钮 */}
@@ -243,7 +243,7 @@ export function MessageBubble({ message, onRegenerate, onResend, onSend }: Messa
       </Avatar>
 
       <div
-        className={`min-w-0 max-w-[75%] space-y-1 ${isUser ? 'items-end' : ''}`}
+        className={`min-w-0 max-w-[85%] sm:max-w-[75%] space-y-1 overflow-hidden ${isUser ? 'items-end' : ''}`}
         onClick={handleTap}
       >
         <div

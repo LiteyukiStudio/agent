@@ -45,7 +45,7 @@ export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProp
   const placeholder = isMobile ? t('placeholderShort') : t('placeholder')
 
   return (
-    <div className="border-t bg-background p-4">
+    <div className="border-t bg-background px-3 py-3 sm:p-4">
       <div className="mx-auto flex max-w-3xl items-end gap-2">
         <div className="relative flex-1">
           <Textarea

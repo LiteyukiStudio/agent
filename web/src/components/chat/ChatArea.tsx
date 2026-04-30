@@ -51,7 +51,7 @@ export function ChatArea({ session, isLoading, onSend, onStop, onTogglePublic }:
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
-      <div className="flex h-14 items-center justify-between border-b px-6 pl-14 md:pl-6">
+      <div className="flex h-14 items-center justify-between border-b px-3 pl-14 sm:px-6 md:pl-6">
         <h2 className="text-sm font-medium truncate">{session.title}</h2>
         <DropdownMenu>
           <DropdownMenuTrigger
@@ -91,7 +91,7 @@ export function ChatArea({ session, isLoading, onSend, onStop, onTogglePublic }:
 
       {/* Messages */}
       <ScrollArea className="flex-1">
-        <div className="mx-auto max-w-3xl space-y-6 overflow-hidden p-6">
+        <div className="mx-auto max-w-3xl space-y-6 overflow-hidden px-3 py-4 sm:p-6">
           {session.messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <Bot className="mb-3 size-10" />
