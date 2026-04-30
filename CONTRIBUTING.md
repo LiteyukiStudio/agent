@@ -158,6 +158,21 @@ uv run alembic current
 
 应用启动时会自动执行 `alembic upgrade head`，无需手动操作。
 
+**⚠️ 迁移文件必须同时兼容 SQLite（开发）和 PostgreSQL（生产）。** 自动生成的迁移不一定能直接用，需要手动检查并调整：
+
+- **新增 NOT NULL 列**：已有数据的表不能直接加 NOT NULL，必须分步：
+  ```python
+  # 1. 加 nullable 列（带 server_default）
+  op.add_column("table", sa.Column("col", sa.String(20), nullable=True, server_default="value"))
+  # 2. 填充已有行
+  op.execute("UPDATE table SET col = 'value' WHERE col IS NULL")
+  # 3. 改为 NOT NULL
+  op.alter_column("table", "col", nullable=False)
+  ```
+- **`op.alter_column`**：SQLite 不支持大部分 ALTER COLUMN 操作，如需修改列类型需使用 `op.batch_alter_table`
+- **Boolean 类型**：PostgreSQL 有原生 Boolean，SQLite 用 INTEGER(0/1)，ORM 层自动处理，但原始 SQL 注意区分
+- **测试**：迁移写完后建议分别在本地 SQLite 和 docker-compose 的 PostgreSQL 上验证
+
 ### 变更后必须 Lint
 
 **任何代码变更后，必须对变更部分执行 lint 检查，确认通过后再提交。** 这是强制性规则，适用于所有开发者和 AI 编码助手。
