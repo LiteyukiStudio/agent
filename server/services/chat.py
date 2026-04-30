@@ -314,6 +314,18 @@ async def stream_response(
     # 保存后台 task 需要的参数（避免闭包引用请求级 db）
     _assistant_msg_id = assistant_msg.id if assistant_msg else None
 
+    # 预先在请求级 db 中计算 msg_count（此时用户消息已 commit，一定能查到）
+    _user_msg_count = 0
+    if session_id:
+        from sqlalchemy import func as sa_func
+
+        _count_result = await db.execute(
+            select(sa_func.count())
+            .select_from(Message)
+            .where(Message.session_id == session_id, Message.role == "user"),
+        )
+        _user_msg_count = _count_result.scalar() or 0
+
     async def _run_llm_background() -> None:
         """后台运行 LLM 并定期 flush 到数据库。前端断开不影响此 task。"""
         from server.database import async_session_factory
@@ -498,20 +510,19 @@ async def stream_response(
                 # 更新会话摘要 + 自动标题
                 updated_title = None
                 if session_id:
+                    # 确保能读到最新数据（请求级 db commit 的用户消息）
+                    await bg_db.expire_all()
                     result = await bg_db.execute(select(ChatSession).where(ChatSession.id == session_id))
                     chat_session = result.scalar_one_or_none()
                     if chat_session:
+                        # 更新会话最后消息预览
                         if assistant_text:
                             chat_session.last_message = assistant_text[:200]
+                        elif not chat_session.last_message:
+                            # AI 无文本回复时，用用户消息作为预览
+                            chat_session.last_message = content[:200]
                         if not chat_session.title_custom and content.strip():
-                            from sqlalchemy import func as sa_func
-
-                            count_result = await bg_db.execute(
-                                select(sa_func.count())
-                                .select_from(Message)
-                                .where(Message.session_id == session_id, Message.role == "user"),
-                            )
-                            msg_count = count_result.scalar() or 0
+                            msg_count = _user_msg_count
                             # 首次对话生成标题，之后每 5 次更新一次（第1、6、11、16...次）
                             should_update = msg_count == 1 or (msg_count > 1 and (msg_count - 1) % 5 == 0)
                             logger.info(
