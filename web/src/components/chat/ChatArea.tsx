@@ -22,10 +22,47 @@ export function ChatArea({ session, isLoading, onSend, onStop, onTogglePublic }:
   const { t } = useTranslation('chat')
   const { t: tc } = useTranslation('common')
   const bottomRef = useRef<HTMLDivElement>(null)
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const isNearBottomRef = useRef(true)
 
+  // 检测用户是否在底部（允许 80px 误差）
+  function checkNearBottom() {
+    const el = scrollContainerRef.current
+    if (!el)
+      return true
+    return el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  }
+
+  // 监听滚动事件，记录用户是否在底部
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [session?.messages.length, isLoading])
+    const el = scrollContainerRef.current
+    if (!el)
+      return
+    function onScroll() {
+      isNearBottomRef.current = checkNearBottom()
+    }
+    el.addEventListener('scroll', onScroll, { passive: true })
+    return () => el.removeEventListener('scroll', onScroll)
+  }, [session?.id])
+
+  // 内容变化时如果在底部则自动滚动
+  useEffect(() => {
+    if (isNearBottomRef.current) {
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  })
+
+  // 新消息来时始终滚动（用户发送消息后）
+  const lastMsgCountRef = useRef(0)
+  useEffect(() => {
+    const count = session?.messages.length || 0
+    if (count > lastMsgCountRef.current) {
+      // 新消息到来，强制滚动到底部
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+      isNearBottomRef.current = true
+    }
+    lastMsgCountRef.current = count
+  }, [session?.messages.length])
 
   if (!session) {
     return (
@@ -96,7 +133,17 @@ export function ChatArea({ session, isLoading, onSend, onStop, onTogglePublic }:
 
       {/* Messages */}
       <ScrollArea className="flex-1">
-        <div className="mx-auto max-w-3xl space-y-6 overflow-hidden px-3 py-4 sm:p-6">
+        <div
+          ref={(el) => {
+            // 获取 ScrollArea Viewport（实际滚动容器是父元素）
+            if (el && !scrollContainerRef.current) {
+              const viewport = el.closest('[data-slot="scroll-area-viewport"]') as HTMLDivElement | null
+              if (viewport)
+                scrollContainerRef.current = viewport
+            }
+          }}
+          className="mx-auto max-w-3xl space-y-6 overflow-hidden px-3 py-4 sm:p-6"
+        >
           {session.messages.length === 0 && (
             <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
               <Bot className="mb-3 size-10" />

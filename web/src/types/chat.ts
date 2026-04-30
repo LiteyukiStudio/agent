@@ -8,6 +8,7 @@ export interface ToolCall {
 
 export type MessagePart
   = | { type: 'text', content: string }
+    | { type: 'thinking', content: string }
     | { type: 'tool_call', toolCall: ToolCall }
     | { type: 'options', toolCall: ToolCall }
 

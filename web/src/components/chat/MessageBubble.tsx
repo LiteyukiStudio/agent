@@ -1,7 +1,7 @@
 import type { ComponentPropsWithoutRef } from 'react'
 import type { Message, MessagePart, ToolCall } from '@/types/chat'
 import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, ClipboardCopy, ExternalLink, RefreshCw, User } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -17,6 +17,8 @@ interface MessageBubbleProps {
   onRegenerate?: () => void
   onResend?: (content: string) => void
   onSend?: (content: string) => void
+  /** 只读模式：不使用当前登录用户头像（用于 admin 查看他人会话） */
+  readOnly?: boolean
 }
 
 const markdownClasses = 'prose prose-sm dark:prose-invert max-w-none break-words overflow-hidden [&_table]:text-xs [&_table]:w-full [&_table]:border-collapse [&_table]:block [&_table]:overflow-x-auto [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_pre]:bg-background [&_pre]:text-xs [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:text-xs [&_code]:break-all [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_table]:my-2'
@@ -77,6 +79,16 @@ const markdownComponents = { a: MarkdownLink, code: CodeBlock }
 
 function ThinkingBlock({ content }: { content: string }) {
   const [expanded, setExpanded] = useState(false)
+  const previewRef = useRef<HTMLDivElement>(null)
+  const lines = content.split('\n').filter(Boolean)
+  const previewLines = lines.slice(-3)
+
+  // 自动滚动到最新内容
+  useEffect(() => {
+    if (previewRef.current && !expanded) {
+      previewRef.current.scrollTop = previewRef.current.scrollHeight
+    }
+  }, [content, expanded])
 
   return (
     <div className="mb-1.5">
@@ -88,15 +100,27 @@ function ThinkingBlock({ content }: { content: string }) {
         {expanded
           ? <ChevronDown className="size-3" />
           : <ChevronRight className="size-3" />}
-        <span>Thinking...</span>
+        <span className="animate-pulse">Thinking...</span>
       </button>
-      {expanded && (
-        <div className="mt-1 border-l-2 border-muted-foreground/20 pl-3 text-xs text-muted-foreground/60 leading-relaxed">
-          <div className="prose prose-sm dark:prose-invert max-w-none opacity-60 [&_p]:my-0.5 [&_p]:text-xs [&_code]:text-[11px]">
-            <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{content}</Markdown>
-          </div>
-        </div>
-      )}
+      {expanded
+        ? (
+            <div className="mt-1 border-l-2 border-muted-foreground/20 pl-3 text-xs text-muted-foreground/60 leading-relaxed max-h-60 overflow-y-auto">
+              <div className="prose prose-sm dark:prose-invert max-w-none opacity-60 [&_p]:my-0.5 [&_p]:text-xs [&_code]:text-[11px]">
+                <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{content}</Markdown>
+              </div>
+            </div>
+          )
+        : (
+            <div
+              ref={previewRef}
+              className="mt-1 border-l-2 border-muted-foreground/20 pl-3 text-xs text-muted-foreground/50 leading-relaxed max-h-[3.6em] overflow-hidden"
+            >
+              {previewLines.map((line, i) => (
+                // eslint-disable-next-line react/no-array-index-key
+                <div key={i} className="truncate">{line}</div>
+              ))}
+            </div>
+          )}
     </div>
   )
 }
@@ -333,14 +357,22 @@ function ToolCallGroup({ toolCalls }: { toolCalls: ToolCall[] }) {
   )
 }
 
-/** 渲染交错排列的消息内容（文本 + 工具调用） */
+/** 渲染交错排列的消息内容（文本 + thinking + 工具调用） */
 function InterleavedParts({ parts, onSend }: { parts: MessagePart[], onSend?: (content: string) => void }) {
   // 将连续的 tool_call 分组
-  const groups: Array<{ type: 'text', content: string } | { type: 'tool_calls', calls: ToolCall[] } | { type: 'options', toolCall: ToolCall }> = []
+  const groups: Array<
+    | { type: 'text', content: string }
+    | { type: 'thinking', content: string }
+    | { type: 'tool_calls', calls: ToolCall[] }
+    | { type: 'options', toolCall: ToolCall }
+  > = []
 
   for (const part of parts) {
     if (part.type === 'text') {
       groups.push({ type: 'text', content: part.content })
+    }
+    else if (part.type === 'thinking') {
+      groups.push({ type: 'thinking', content: part.content })
     }
     else if (part.type === 'options') {
       groups.push({ type: 'options', toolCall: part.toolCall })
@@ -360,6 +392,10 @@ function InterleavedParts({ parts, onSend }: { parts: MessagePart[], onSend?: (c
   return (
     <>
       {groups.map((group, i) => {
+        if (group.type === 'thinking') {
+          // eslint-disable-next-line react/no-array-index-key
+          return <ThinkingBlock key={`think-${i}`} content={group.content} />
+        }
         if (group.type === 'text') {
           return (
             // eslint-disable-next-line react/no-array-index-key
@@ -393,7 +429,7 @@ function InterleavedParts({ parts, onSend }: { parts: MessagePart[], onSend?: (c
   )
 }
 
-export function MessageBubble({ message, onRegenerate, onResend, onSend }: MessageBubbleProps) {
+export function MessageBubble({ message, onRegenerate, onResend, onSend, readOnly }: MessageBubbleProps) {
   const isUser = message.role === 'user'
   const { user } = useAuth()
   const [showActions, setShowActions] = useState(false)
@@ -411,7 +447,7 @@ export function MessageBubble({ message, onRegenerate, onResend, onSend }: Messa
   return (
     <div className={`group/msg flex gap-3 min-w-0 ${isUser ? 'flex-row-reverse' : ''}`}>
       <Avatar className="mt-0.5 size-8 shrink-0">
-        {isUser && user?.avatar_url && <AvatarImage src={user.avatar_url} alt={user.username} />}
+        {isUser && !readOnly && user?.avatar_url && <AvatarImage src={user.avatar_url} alt={user.username} />}
         <AvatarFallback className={isUser ? 'bg-primary text-primary-foreground' : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900 dark:text-emerald-300'}>
           {isUser ? <User className="size-4" /> : <Bot className="size-4" />}
         </AvatarFallback>
@@ -434,7 +470,7 @@ export function MessageBubble({ message, onRegenerate, onResend, onSend }: Messa
               )
             : (
                 <>
-                  {message.thinking && (
+                  {message.thinking && (!message.parts || message.parts.length === 0) && (
                     <ThinkingBlock content={message.thinking} />
                   )}
                   {message.parts && message.parts.length > 0

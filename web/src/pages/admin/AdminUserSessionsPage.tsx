@@ -1,4 +1,4 @@
-import type { Message } from '@/types/chat'
+import type { Message, MessagePart, ToolCall } from '@/types/chat'
 import { ArrowLeft, Bot, MessageSquare } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
@@ -27,12 +27,49 @@ interface SessionMessages {
 }
 
 function parseMessages(raw: SessionMessages['messages']): Message[] {
-  return raw.map(m => ({
-    id: m.id,
-    role: m.role,
-    content: m.content,
-    timestamp: new Date(m.created_at || ''),
-  }))
+  return raw.map((m) => {
+    // 解析工具调用 JSON
+    let toolCalls: ToolCall[] | undefined
+    let parts: MessagePart[] | undefined
+
+    if (m.tool_calls) {
+      try {
+        const rawCalls = JSON.parse(m.tool_calls) as Array<{
+          name: string
+          args?: Record<string, unknown>
+          result?: string
+          error?: boolean
+        }>
+        toolCalls = rawCalls.map((tc, i) => ({
+          id: `tc-${i}`,
+          name: tc.name,
+          args: tc.args || {},
+          result: tc.result,
+          status: tc.error ? 'error' as const : 'completed' as const,
+        }))
+        // 构建 parts：文本 + 工具调用交错
+        parts = []
+        if (m.content) {
+          parts.push({ type: 'text', content: m.content })
+        }
+        for (const tc of toolCalls) {
+          parts.push({ type: 'tool_call', toolCall: tc })
+        }
+      }
+      catch {
+        // JSON 解析失败，忽略工具调用
+      }
+    }
+
+    return {
+      id: m.id,
+      role: m.role,
+      content: m.content,
+      timestamp: new Date(m.created_at || ''),
+      toolCalls,
+      parts,
+    }
+  })
 }
 
 export function AdminUserSessionsPage() {
@@ -99,7 +136,7 @@ export function AdminUserSessionsPage() {
         <ScrollArea className="flex-1">
           <div className="mx-auto max-w-3xl space-y-6 p-6">
             {messages.map(msg => (
-              <MessageBubble key={msg.id} message={msg} />
+              <MessageBubble key={msg.id} message={msg} readOnly />
             ))}
             {messages.length === 0 && (
               <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">

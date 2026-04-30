@@ -6,6 +6,7 @@ from model_config import get_model
 
 from .agents.gitea_agent.agent import gitea_agent
 from .agents.misskey_agent.agent import misskey_agent
+from .agents.push_agent.agent import push_agent
 from .agents.search_agent.agent import search_agent
 from .callbacks import on_tool_error
 from .tools import all_tools as global_tools
@@ -64,5 +65,5 @@ liteyuki-agent install  # 设为开机自启
 引导完成后提醒用户在 Local Agent 连接成功后再继续操作。\
 不要在用户未连接时反复尝试调用 local_ 工具。""",
     tools=global_tools,
-    sub_agents=[gitea_agent, misskey_agent, search_agent],
+    sub_agents=[gitea_agent, misskey_agent, push_agent, search_agent],
 )

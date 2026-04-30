@@ -205,6 +205,7 @@ export function useChat() {
     const parts: MessagePart[] = []
     let toolCallCounter = 0
     let lastTextPartIndex = -1 // 跟踪最后一个 text part 的索引
+    let lastThinkingPartIndex = -1 // 跟踪最后一个 thinking part 的索引
 
     // Helper to build the current assistant message snapshot
     function buildAssistantMsg(contentOverride?: string): Message {
@@ -235,6 +236,16 @@ export function useChat() {
 
         if (eventType === 'thinking') {
           thinkingContent += event.content as string
+          // 追加到 parts：合并连续 thinking 或新建 thinking part
+          if (lastThinkingPartIndex >= 0 && parts[lastThinkingPartIndex]?.type === 'thinking'
+            && (parts.length - 1 === lastThinkingPartIndex)) {
+            ;(parts[lastThinkingPartIndex] as { type: 'thinking', content: string }).content += event.content as string
+          }
+          else {
+            parts.push({ type: 'thinking', content: event.content as string })
+            lastThinkingPartIndex = parts.length - 1
+          }
+          lastTextPartIndex = -1 // thinking 打断连续 text
           updateAssistantMsg()
         }
         else if (eventType === 'text') {
@@ -250,6 +261,7 @@ export function useChat() {
             parts.push({ type: 'text', content: text })
             lastTextPartIndex = parts.length - 1
           }
+          lastThinkingPartIndex = -1 // text 打断连续 thinking
           updateAssistantMsg()
         }
         else if (eventType === 'tool_call') {

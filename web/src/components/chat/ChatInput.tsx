@@ -54,7 +54,7 @@ export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProp
             onChange={e => setValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder={placeholder}
-            className="min-h-[44px] max-h-[200px] resize-none pr-4 text-base md:text-sm"
+            className="min-h-[48px] max-h-[200px] resize-none py-3 pr-4 text-base leading-6"
             rows={1}
             disabled={disabled}
             onInput={(e) => {
@@ -70,7 +70,7 @@ export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProp
                 size="icon"
                 variant="destructive"
                 onClick={onStop}
-                className="size-[44px] shrink-0 rounded-xl"
+                className="size-[48px] shrink-0 rounded-xl"
               >
                 <Square className="size-4" />
               </Button>
@@ -80,7 +80,7 @@ export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProp
                 size="icon"
                 onClick={handleSend}
                 disabled={!value.trim() || disabled}
-                className="size-[44px] shrink-0 rounded-xl"
+                className="size-[48px] shrink-0 rounded-xl"
               >
                 <ArrowUp className="size-4" />
               </Button>
