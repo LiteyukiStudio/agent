@@ -99,7 +99,9 @@ export function App() {
     checkUpdate(VERSION).then((update) => {
       if (update) {
         addLog("warn", `New version available: ${update.current} → ${update.latest}`);
-        addLog("warn", `Run: ${update.command}`);
+        for (const cmd of update.commands) {
+          addLog("warn", `Run: ${cmd}`);
+        }
         if (update.changelog.length > 0) {
           addLog("info", "Changelog:");
           for (const line of update.changelog) {

@@ -95,7 +95,8 @@ function isNewer(latest: string, current: string): boolean {
 export interface UpdateInfo {
   current: string;
   latest: string;
-  command: string;
+  /** 各包管理器的更新命令 */
+  commands: string[];
   /** Markdown 格式的 changelog 行列表 */
   changelog: string[];
 }
@@ -112,7 +113,10 @@ export async function checkUpdate(currentVersion: string): Promise<UpdateInfo | 
   return {
     current: currentVersion,
     latest,
-    command: `npm install -g ${PACKAGE_NAME}@${latest}`,
+    commands: [
+      `npm install -g ${PACKAGE_NAME}@${latest}`,
+      `pnpm add -g ${PACKAGE_NAME}@${latest}`,
+    ],
     changelog,
   };
 }
