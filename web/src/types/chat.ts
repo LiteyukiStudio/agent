@@ -6,6 +6,11 @@ export interface ToolCall {
   status: 'pending' | 'running' | 'completed' | 'error'
 }
 
+export type MessagePart
+  = | { type: 'text', content: string }
+    | { type: 'tool_call', toolCall: ToolCall }
+    | { type: 'options', toolCall: ToolCall }
+
 export interface Message {
   id: string
   role: 'user' | 'assistant'
@@ -13,6 +18,8 @@ export interface Message {
   thinking?: string
   timestamp: Date
   toolCalls?: ToolCall[]
+  /** 交错排列的消息片段（文本 + 工具调用），按时间顺序 */
+  parts?: MessagePart[]
 }
 
 export interface Session {

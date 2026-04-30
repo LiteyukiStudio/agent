@@ -1,15 +1,16 @@
 import type { ComponentPropsWithoutRef } from 'react'
+import type { Message, MessagePart, ToolCall } from '@/types/chat'
+import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, ClipboardCopy, ExternalLink, RefreshCw, User } from 'lucide-react'
 import { useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowUp, Bot, Check, ChevronDown, ChevronRight, ClipboardCopy, ExternalLink, RefreshCw, User } from 'lucide-react'
 import { toast } from 'sonner'
+import { ToolCallCard } from '@/components/chat/ToolCallCard'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ToolCallCard } from '@/components/chat/ToolCallCard'
 import { useAuth } from '@/hooks/useAuth'
-import type { Message } from '@/types/chat'
 
 interface MessageBubbleProps {
   message: Message
@@ -17,6 +18,62 @@ interface MessageBubbleProps {
   onResend?: (content: string) => void
   onSend?: (content: string) => void
 }
+
+const markdownClasses = 'prose prose-sm dark:prose-invert max-w-none break-words overflow-hidden [&_table]:text-xs [&_table]:w-full [&_table]:border-collapse [&_table]:block [&_table]:overflow-x-auto [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_pre]:bg-background [&_pre]:text-xs [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:text-xs [&_code]:break-all [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_table]:my-2'
+
+// External links: primary color + icon + new tab; internal links: default
+function MarkdownLink({ href, children, ...props }: ComponentPropsWithoutRef<'a'>) {
+  const isExternal = href && (href.startsWith('http://') || href.startsWith('https://'))
+    && !href.startsWith(window.location.origin)
+  if (isExternal) {
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="inline-flex items-center gap-0.5 text-primary no-underline hover:underline"
+        {...props}
+      >
+        {children}
+        <ExternalLink className="inline size-3 shrink-0" />
+      </a>
+    )
+  }
+  return <a href={href} {...props}>{children}</a>
+}
+
+/** 代码块：右上角带复制按钮 */
+function CodeBlock({ children, className, ...props }: ComponentPropsWithoutRef<'code'>) {
+  const [copied, setCopied] = useState(false)
+  const isInline = !className && typeof children === 'string' && !children.includes('\n')
+
+  if (isInline) {
+    return <code className={className} {...props}>{children}</code>
+  }
+
+  const text = typeof children === 'string' ? children : String(children || '').replace(/\n$/, '')
+
+  function handleCopyCode() {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(setCopied, 2000, false)
+  }
+
+  return (
+    <div className="relative group/code">
+      <button
+        type="button"
+        onClick={handleCopyCode}
+        className="absolute right-2 top-2 z-10 rounded border bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/code:opacity-100 active:opacity-100"
+      >
+        {copied ? <Check className="size-3" /> : <ClipboardCopy className="size-3" />}
+      </button>
+      <code className={className} {...props}>{children}</code>
+    </div>
+  )
+}
+
+const markdownComponents = { a: MarkdownLink, code: CodeBlock }
 
 function ThinkingBlock({ content }: { content: string }) {
   const [expanded, setExpanded] = useState(false)
@@ -44,31 +101,6 @@ function ThinkingBlock({ content }: { content: string }) {
   )
 }
 
-const markdownClasses = 'prose prose-sm dark:prose-invert max-w-none break-words overflow-hidden [&_table]:text-xs [&_table]:w-full [&_table]:border-collapse [&_table]:block [&_table]:overflow-x-auto [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_pre]:bg-background [&_pre]:text-xs [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:text-xs [&_code]:break-all [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_table]:my-2'
-
-// External links: primary color + icon + new tab; internal links: default
-function MarkdownLink({ href, children, ...props }: ComponentPropsWithoutRef<'a'>) {
-  const isExternal = href && (href.startsWith('http://') || href.startsWith('https://'))
-    && !href.startsWith(window.location.origin)
-  if (isExternal) {
-    return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-0.5 text-primary no-underline hover:underline"
-        {...props}
-      >
-        {children}
-        <ExternalLink className="inline size-3 shrink-0" />
-      </a>
-    )
-  }
-  return <a href={href} {...props}>{children}</a>
-}
-
-const markdownComponents = { a: MarkdownLink }
-
 /** 选项按钮组：支持单选、多选、自由输入 */
 function OptionsBlock({ question, options, mode = 'single', icons, onSend }: {
   question?: string
@@ -78,36 +110,41 @@ function OptionsBlock({ question, options, mode = 'single', icons, onSend }: {
   onSend?: (content: string) => void
 }) {
   const [submitted, setSubmitted] = useState(false)
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [customValue, setCustomValue] = useState('')
   const [showInput, setShowInput] = useState(mode === 'free')
   const inputRef = useRef<HTMLInputElement>(null)
 
   function handleSingleSelect(opt: string) {
-    if (submitted) return
+    if (submitted)
+      return
     setSelected(new Set([opt]))
     setSubmitted(true)
     onSend?.(opt)
   }
 
   function handleMultiToggle(opt: string) {
-    if (submitted) return
+    if (submitted)
+      return
     setSelected((prev) => {
       const next = new Set(prev)
-      if (next.has(opt)) next.delete(opt)
+      if (next.has(opt))
+        next.delete(opt)
       else next.add(opt)
       return next
     })
   }
 
   function handleMultiSubmit() {
-    if (submitted || selected.size === 0) return
+    if (submitted || selected.size === 0)
+      return
     setSubmitted(true)
     onSend?.([...selected].join('、'))
   }
 
   function handleCustomSubmit() {
-    if (!customValue.trim() || submitted) return
+    if (!customValue.trim() || submitted)
+      return
     setSubmitted(true)
     setSelected(new Set([customValue.trim()]))
     onSend?.(customValue.trim())
@@ -116,7 +153,8 @@ function OptionsBlock({ question, options, mode = 'single', icons, onSend }: {
   /** 渲染选项图标：URL → img，emoji/文本 → span，空 → null */
   function renderIcon(index: number) {
     const icon = icons?.[index]
-    if (!icon) return null
+    if (!icon)
+      return null
     if (icon.startsWith('http://') || icon.startsWith('https://')) {
       return <img src={icon} alt="" className="size-4 shrink-0 rounded-sm object-contain" />
     }
@@ -188,7 +226,9 @@ function OptionsBlock({ question, options, mode = 'single', icons, onSend }: {
             className="rounded-full"
             onClick={handleMultiSubmit}
           >
-            确认选择 ({selected.size})
+            确认选择 (
+            {selected.size}
+            )
           </Button>
         )}
       </div>
@@ -200,7 +240,10 @@ function OptionsBlock({ question, options, mode = 'single', icons, onSend }: {
             ref={inputRef}
             value={customValue}
             onChange={e => setCustomValue(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleCustomSubmit() }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter')
+                handleCustomSubmit()
+            }}
             placeholder={mode === 'free' ? '输入你的回答（也可点击上方建议）' : '输入你的回答'}
             className="h-8 text-sm"
           />
@@ -215,6 +258,138 @@ function OptionsBlock({ question, options, mode = 'single', icons, onSend }: {
         </div>
       )}
     </div>
+  )
+}
+
+const TOOL_CALLS_COLLAPSE_THRESHOLD = 3
+
+/** 连续工具调用组：超过阈值时折叠 */
+function ToolCallGroup({ toolCalls }: { toolCalls: ToolCall[] }) {
+  const [expanded, setExpanded] = useState(false)
+  const { t } = useTranslation('chat')
+
+  if (toolCalls.length <= TOOL_CALLS_COLLAPSE_THRESHOLD) {
+    return (
+      <>
+        {toolCalls.map(tc => <ToolCallCard key={tc.id} toolCall={tc} />)}
+      </>
+    )
+  }
+
+  const visibleCalls = expanded ? toolCalls : toolCalls.slice(-TOOL_CALLS_COLLAPSE_THRESHOLD)
+  const hiddenCount = toolCalls.length - (expanded ? toolCalls.length : TOOL_CALLS_COLLAPSE_THRESHOLD)
+  const completedCount = toolCalls.filter(tc => tc.status === 'completed').length
+  const runningCount = toolCalls.filter(tc => tc.status === 'running').length
+  const errorCount = toolCalls.filter(tc => tc.status === 'error').length
+
+  return (
+    <div className="space-y-1">
+      {!expanded && (
+        <button
+          type="button"
+          onClick={() => setExpanded(true)}
+          className="flex items-center gap-1.5 rounded-lg border border-dashed px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+        >
+          <ChevronRight className="size-3" />
+          <span>{t('toolCollapse', { count: toolCalls.length })}</span>
+          {runningCount > 0 && (
+            <span className="text-[10px] text-blue-600">
+              ·
+              {runningCount}
+              {' '}
+              {t('toolStatus.running')}
+            </span>
+          )}
+          {completedCount > 0 && (
+            <span className="text-[10px] text-emerald-600">
+              ·
+              {completedCount}
+              {' '}
+              {t('toolStatus.completed')}
+            </span>
+          )}
+          {errorCount > 0 && (
+            <span className="text-[10px] text-red-600">
+              ·
+              {errorCount}
+              {' '}
+              {t('toolStatus.error')}
+            </span>
+          )}
+        </button>
+      )}
+      {expanded && hiddenCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setExpanded(false)}
+          className="flex items-center gap-1.5 rounded-lg border border-dashed px-2.5 py-1 text-xs text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+        >
+          <ChevronDown className="size-3" />
+          <span>{t('toolCollapseHide')}</span>
+        </button>
+      )}
+      {visibleCalls.map(tc => <ToolCallCard key={tc.id} toolCall={tc} />)}
+    </div>
+  )
+}
+
+/** 渲染交错排列的消息内容（文本 + 工具调用） */
+function InterleavedParts({ parts, onSend }: { parts: MessagePart[], onSend?: (content: string) => void }) {
+  // 将连续的 tool_call 分组
+  const groups: Array<{ type: 'text', content: string } | { type: 'tool_calls', calls: ToolCall[] } | { type: 'options', toolCall: ToolCall }> = []
+
+  for (const part of parts) {
+    if (part.type === 'text') {
+      groups.push({ type: 'text', content: part.content })
+    }
+    else if (part.type === 'options') {
+      groups.push({ type: 'options', toolCall: part.toolCall })
+    }
+    else {
+      // tool_call: 和前一个 tool_calls 组合并
+      const last = groups[groups.length - 1]
+      if (last && last.type === 'tool_calls') {
+        last.calls.push(part.toolCall)
+      }
+      else {
+        groups.push({ type: 'tool_calls', calls: [part.toolCall] })
+      }
+    }
+  }
+
+  return (
+    <>
+      {groups.map((group, i) => {
+        if (group.type === 'text') {
+          return (
+            // eslint-disable-next-line react/no-array-index-key
+            <div key={`text-${i}`} className={markdownClasses}>
+              <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{group.content}</Markdown>
+            </div>
+          )
+        }
+        if (group.type === 'options') {
+          const tc = group.toolCall
+          const options = tc.args.options as string[]
+          const question = tc.args.question as string | undefined
+          const mode = (tc.args.mode as 'single' | 'multiple' | 'free') || 'single'
+          const icons = (tc.args.icons as (string | null)[] | undefined) || undefined
+          return (
+            <OptionsBlock
+              key={tc.id}
+              question={question}
+              options={options}
+              mode={mode}
+              icons={icons}
+              onSend={onSend}
+            />
+          )
+        }
+        // tool_calls group
+        // eslint-disable-next-line react/no-array-index-key
+        return <ToolCallGroup key={`tc-group-${i}`} toolCalls={group.calls} />
+      })}
+    </>
   )
 }
 
@@ -262,39 +437,18 @@ export function MessageBubble({ message, onRegenerate, onResend, onSend }: Messa
                   {message.thinking && (
                     <ThinkingBlock content={message.thinking} />
                   )}
-                  <div className={markdownClasses}>
-                    <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{message.content}</Markdown>
-                  </div>
+                  {message.parts && message.parts.length > 0
+                    ? <InterleavedParts parts={message.parts} onSend={onSend} />
+                    : (
+                        <div className={markdownClasses}>
+                          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{message.content}</Markdown>
+                        </div>
+                      )}
                 </>
               )}
         </div>
 
-        {message.toolCalls && message.toolCalls.length > 0 && (
-          <div>
-            {message.toolCalls.map((tc) => {
-              // present_options: 渲染为可点击的选项按钮
-              if (tc.name === 'present_options' && tc.args.options) {
-                const options = tc.args.options as string[]
-                const question = tc.args.question as string | undefined
-                const mode = (tc.args.mode as 'single' | 'multiple' | 'free') || 'single'
-                const icons = (tc.args.icons as (string | null)[] | undefined) || undefined
-                return (
-                  <OptionsBlock
-                    key={tc.id}
-                    question={question}
-                    options={options}
-                    mode={mode}
-                    icons={icons}
-                    onSend={onSend}
-                  />
-                )
-              }
-              return <ToolCallCard key={tc.id} toolCall={tc} />
-            })}
-          </div>
-        )}
-
-        {/* 时间 + 操作按钮 */}
+        {/* 时间 + 操作按钮（紧贴消息底部） */}
         <div className={`flex items-center gap-1 px-1 ${isUser ? 'flex-row-reverse' : ''}`}>
           <span className="text-[11px] text-muted-foreground">
             {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -304,7 +458,10 @@ export function MessageBubble({ message, onRegenerate, onResend, onSend }: Messa
               variant="ghost"
               size="icon"
               className="size-6 text-muted-foreground hover:text-foreground"
-              onClick={(e) => { e.stopPropagation(); handleCopy() }}
+              onClick={(e) => {
+                e.stopPropagation()
+                handleCopy()
+              }}
             >
               <ClipboardCopy className="size-3" />
             </Button>
@@ -313,7 +470,10 @@ export function MessageBubble({ message, onRegenerate, onResend, onSend }: Messa
                 variant="ghost"
                 size="icon"
                 className="size-6 text-muted-foreground hover:text-foreground"
-                onClick={(e) => { e.stopPropagation(); onResend(message.content) }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onResend(message.content)
+                }}
               >
                 <RefreshCw className="size-3" />
               </Button>
@@ -323,7 +483,10 @@ export function MessageBubble({ message, onRegenerate, onResend, onSend }: Messa
                 variant="ghost"
                 size="icon"
                 className="size-6 text-muted-foreground hover:text-foreground"
-                onClick={(e) => { e.stopPropagation(); onRegenerate() }}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onRegenerate()
+                }}
               >
                 <RefreshCw className="size-3" />
               </Button>

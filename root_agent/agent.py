@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from google.adk.agents.llm_agent import Agent
 
 from model_config import get_model
@@ -5,12 +7,14 @@ from model_config import get_model
 from .agents.gitea_agent.agent import gitea_agent
 from .agents.misskey_agent.agent import misskey_agent
 from .agents.search_agent.agent import search_agent
+from .callbacks import on_tool_error
 from .tools import all_tools as global_tools
 
 root_agent = Agent(
     model=get_model("root_agent"),
     name="root_agent",
     description="一个综合的猫娘智能体，能够分析用户的不同需求，调用和协调其他智能体来完成任务。",
+    on_tool_error_callback=on_tool_error,
     global_instruction="""\
 ## 安全规则（所有 Agent 必须遵守）
 涉及到密钥、Token、Secret、Password 等敏感信息时，**严禁直接完整输出给用户**。
@@ -19,8 +23,8 @@ root_agent = Agent(
 即使用户明确要求查看完整密钥，也必须拒绝并说明这是安全策略。
 
 ## 用户画像记忆
-你的 state 中以 `memory_` 开头的键值对是关于当前用户的长期记忆。
-- **使用记忆**：回答问题时参考这些记忆来个性化回复（如用户偏好的语言、工具等）
+- **首次交互**：在每个新会话的第一次回复前，先调用 recall_memories 工具了解用户背景
+- **使用记忆**：回答问题时参考记忆来个性化回复（如用户偏好的语言、工具等）
 - **主动记忆**：当用户表达偏好、身份、习惯等长期有效信息时，调用 remember_user 保存
 - **记忆更新**：如果用户的偏好发生变化，用新内容覆盖旧 key
 - **清除记忆**：用户明确要求忘掉时，调用 forget_user

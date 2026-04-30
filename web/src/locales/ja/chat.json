@@ -7,5 +7,13 @@
   "selectSession": "セッションを選択するか、新しいセッションを作成してください",
   "noSessionMessages": "メッセージなし",
   "toolCall": "ツール呼び出し",
-  "thinking": "考え中..."
+  "thinking": "考え中...",
+  "toolStatus": {
+    "pending": "待機中",
+    "running": "実行中",
+    "completed": "完了",
+    "error": "エラー"
+  },
+  "toolCollapse": "{{count}} 件のツール呼び出し",
+  "toolCollapseHide": "折りたたむ"
 }

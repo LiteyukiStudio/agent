@@ -7,5 +7,13 @@
   "selectSession": "Select a session or create a new one to get started",
   "noSessionMessages": "No messages",
   "toolCall": "Tool call",
-  "thinking": "Thinking..."
+  "thinking": "Thinking...",
+  "toolStatus": {
+    "pending": "Pending",
+    "running": "Running",
+    "completed": "Done",
+    "error": "Error"
+  },
+  "toolCollapse": "{{count}} tool calls",
+  "toolCollapseHide": "Collapse"
 }

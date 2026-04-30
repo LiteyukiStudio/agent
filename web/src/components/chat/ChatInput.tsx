@@ -1,7 +1,7 @@
 import type { KeyboardEvent } from 'react'
+import { ArrowUp, Square } from 'lucide-react'
 import { useCallback, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ArrowUp, Square } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 

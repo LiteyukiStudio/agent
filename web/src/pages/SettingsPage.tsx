@@ -1,15 +1,15 @@
-import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
-import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Copy, Key, Monitor, Plus, RefreshCw, Trash2 } from 'lucide-react'
-import { FaApple, FaWindows, FaLinux, FaUbuntu, FaFedora, FaSuse, FaCentos, FaRedhat } from 'react-icons/fa6'
-import { SiDebian, SiArchlinux, SiAlpinelinux, SiLinuxmint, SiManjaro } from 'react-icons/si'
+import { useCallback, useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { FaApple, FaCentos, FaFedora, FaLinux, FaRedhat, FaSuse, FaUbuntu, FaWindows } from 'react-icons/fa6'
+import { SiAlpinelinux, SiArchlinux, SiDebian, SiLinuxmint, SiManjaro } from 'react-icons/si'
+import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Input } from '@/components/ui/input'
 import { useTitle } from '@/hooks/useTitle'
 import { apiDelete, apiGet, apiPost } from '@/lib/api'
 
@@ -303,12 +303,12 @@ export function SettingsPage() {
               <div className="flex items-center gap-2">
                 <div>
                   <p className="text-sm font-medium">{tok.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {`lys_...${tok.token_last_eight}`}
-                  {' '}
-                  ·
-                  {new Date(tok.created_at).toLocaleDateString()}
-                </p>
+                  <p className="text-xs text-muted-foreground">
+                    {`lys_...${tok.token_last_eight}`}
+                    {' '}
+                    ·
+                    {new Date(tok.created_at).toLocaleDateString()}
+                  </p>
                 </div>
               </div>
               <Button

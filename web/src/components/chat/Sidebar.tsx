@@ -1,7 +1,6 @@
-import { useState } from 'react'
-import { useTranslation } from 'react-i18next'
-import { useNavigate } from 'react-router'
+import type { Session } from '@/types/chat'
 import {
+  CheckSquare,
   ChevronUp,
   Ellipsis,
   Globe,
@@ -16,11 +15,14 @@ import {
   Snowflake,
   Sun,
   Trash2,
+  X,
 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Separator } from '@/components/ui/separator'
+import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { useNavigate } from 'react-router'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -32,10 +34,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Separator } from '@/components/ui/separator'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
-import type { Session } from '@/types/chat'
 
 interface SidebarProps {
   sessions: Session[]
@@ -78,6 +80,8 @@ export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession,
   const [renamingId, setRenamingId] = useState<string | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [batchMode, setBatchMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set())
   const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(() => {
     return (localStorage.getItem('theme') as 'light' | 'dark' | 'system') || 'system'
   })
@@ -130,16 +134,65 @@ export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession,
 
       <Separator />
 
-      {/* 新建对话按钮 */}
+      {/* 新建对话 + 批量操作 */}
       <div className="p-3">
-        <Button
-          variant="outline"
-          className="w-full justify-start gap-2 text-sm"
-          onClick={onNewSession}
-        >
-          <MessageSquarePlus className="size-4" />
-          {t('newChat')}
-        </Button>
+        {!batchMode
+          ? (
+              <div className="flex gap-2">
+                <Button
+                  variant="outline"
+                  className="flex-1 justify-start gap-2 text-sm"
+                  onClick={onNewSession}
+                >
+                  <MessageSquarePlus className="size-4" />
+                  {t('newChat')}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="size-9 shrink-0 text-muted-foreground"
+                  onClick={() => {
+                    setBatchMode(true)
+                    setSelectedIds(new Set())
+                  }}
+                  title="批量操作"
+                >
+                  <CheckSquare className="size-4" />
+                </Button>
+              </div>
+            )
+          : (
+              <div className="flex gap-2">
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  className="flex-1 gap-1.5 text-sm"
+                  disabled={selectedIds.size === 0}
+                  onClick={() => {
+                    selectedIds.forEach(id => onDeleteSession?.(id))
+                    setBatchMode(false)
+                    setSelectedIds(new Set())
+                  }}
+                >
+                  <Trash2 className="size-3.5" />
+                  删除 (
+                  {selectedIds.size}
+                  )
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="gap-1.5 text-sm text-muted-foreground"
+                  onClick={() => {
+                    setBatchMode(false)
+                    setSelectedIds(new Set())
+                  }}
+                >
+                  <X className="size-3.5" />
+                  取消
+                </Button>
+              </div>
+            )}
       </div>
 
       {/* 会话列表 */}
@@ -150,10 +203,39 @@ export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession,
               key={session.id}
               className={cn(
                 'group relative flex w-full flex-col items-start gap-0.5 rounded-lg px-3 py-2.5 text-left text-sm transition-colors hover:bg-sidebar-accent cursor-pointer',
-                activeSessionId === session.id && 'bg-sidebar-accent',
+                batchMode && 'pl-8',
+                activeSessionId === session.id && !batchMode && 'bg-sidebar-accent',
+                batchMode && selectedIds.has(session.id) && 'bg-destructive/10 border border-destructive/30',
               )}
-              onClick={() => onSelectSession(session.id)}
+              onClick={() => {
+                if (batchMode) {
+                  setSelectedIds((prev) => {
+                    const next = new Set(prev)
+                    if (next.has(session.id))
+                      next.delete(session.id)
+                    else next.add(session.id)
+                    return next
+                  })
+                }
+                else {
+                  onSelectSession(session.id)
+                }
+              }}
             >
+              {/* 批量选择模式下的复选框 */}
+              {batchMode && (
+                <div className="absolute left-2 top-1/2 -translate-y-1/2">
+                  <div className={cn(
+                    'size-4 rounded border-2 flex items-center justify-center transition-colors',
+                    selectedIds.has(session.id)
+                      ? 'bg-destructive border-destructive text-destructive-foreground'
+                      : 'border-muted-foreground/40',
+                  )}
+                  >
+                    {selectedIds.has(session.id) && <CheckSquare className="size-3" />}
+                  </div>
+                </div>
+              )}
               {renamingId === session.id
                 ? (
                     <Input
@@ -188,7 +270,7 @@ export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession,
                   <span className="transition-opacity group-hover:opacity-0 max-sm:hidden">{formatRelativeTime(session.updatedAt)}</span>
                   <DropdownMenu>
                     <DropdownMenuTrigger
-                      render={
+                      render={(
                         <button
                           type="button"
                           className="absolute inset-0 flex items-center justify-center rounded transition-opacity hover:bg-muted opacity-100 sm:opacity-0 sm:group-hover:opacity-100"
@@ -196,7 +278,7 @@ export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession,
                         >
                           <Ellipsis className="size-3.5" />
                         </button>
-                      }
+                      )}
                     />
                     <DropdownMenuContent align="end" side="bottom">
                       <DropdownMenuItem onClick={() => startRename(session)}>
@@ -225,7 +307,7 @@ export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession,
       <div className="p-3">
         <DropdownMenu>
           <DropdownMenuTrigger
-            render={
+            render={(
               <button
                 type="button"
                 className="flex w-full items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors hover:bg-sidebar-accent"
@@ -242,7 +324,7 @@ export function Sidebar({ sessions, activeSessionId, isLoading, onSelectSession,
                 </div>
                 <ChevronUp className="size-4 text-muted-foreground" />
               </button>
-            }
+            )}
           />
           <DropdownMenuContent side="top" align="start" className="w-[248px]">
             <DropdownMenuItem onClick={() => navigate('/settings')}>

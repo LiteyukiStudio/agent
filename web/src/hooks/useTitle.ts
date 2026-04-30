@@ -11,6 +11,8 @@ export function useTitle(page: string) {
 
   useEffect(() => {
     document.title = page ? `${page} - ${appName}` : appName
-    return () => { document.title = appName }
+    return () => {
+      document.title = appName
+    }
   }, [page, appName])
 }

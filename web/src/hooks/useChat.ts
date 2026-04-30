@@ -1,8 +1,8 @@
+import type { Message, MessagePart, Session, ToolCall } from '@/types/chat'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
-import { apiDelete, apiGet, apiPatch, apiPost, streamSSE } from '@/lib/api'
 import { useAuth } from '@/hooks/useAuth'
-import type { Message, Session, ToolCall } from '@/types/chat'
+import { apiDelete, apiGet, apiPatch, apiPost, streamSSE } from '@/lib/api'
 
 interface ApiSession {
   id: string
@@ -54,7 +54,7 @@ export function useChat() {
   const { user } = useAuth()
   const [sessions, setSessions] = useState<Session[]>([])
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
-  const [loadingSessionIds, setLoadingSessionIds] = useState<Set<string>>(new Set())
+  const [loadingSessionIds, setLoadingSessionIds] = useState<Set<string>>(() => new Set())
   const [messagesBySession, setMessagesBySession] = useState<Record<string, Message[]>>({})
   const abortRef = useRef<Record<string, AbortController>>({})
 
@@ -80,6 +80,7 @@ export function useChat() {
         }
       })
       .catch(() => { /* auth guard handles redirect */ })
+  // eslint-disable-next-line react/exhaustive-deps
   }, [user])
 
   // 加载会话消息（切换会话时）
@@ -201,7 +202,9 @@ export function useChat() {
     let assistantContent = ''
     let thinkingContent = ''
     const toolCalls: ToolCall[] = []
+    const parts: MessagePart[] = []
     let toolCallCounter = 0
+    let lastTextPartIndex = -1 // 跟踪最后一个 text part 的索引
 
     // Helper to build the current assistant message snapshot
     function buildAssistantMsg(contentOverride?: string): Message {
@@ -211,7 +214,8 @@ export function useChat() {
         content: contentOverride ?? assistantContent,
         thinking: thinkingContent || undefined,
         timestamp: new Date(),
-        toolCalls: toolCalls.length > 0 ? [...toolCalls] : undefined,
+        toolCalls: toolCalls.length > 0 ? toolCalls.map(tc => ({ ...tc })) : undefined,
+        parts: parts.length > 0 ? parts.map(p => p.type === 'text' ? { ...p } : { ...p, toolCall: { ...p.toolCall } }) : undefined,
       }
     }
 
@@ -234,24 +238,49 @@ export function useChat() {
           updateAssistantMsg()
         }
         else if (eventType === 'text') {
-          assistantContent += event.content as string
+          const text = event.content as string
+          assistantContent += text
+          // 追加到 parts：合并连续文本或新建 text part
+          if (lastTextPartIndex >= 0 && parts[lastTextPartIndex]?.type === 'text'
+            && (parts.length - 1 === lastTextPartIndex)) {
+            // 最后一个 part 就是 text，直接追加
+            ;(parts[lastTextPartIndex] as { type: 'text', content: string }).content += text
+          }
+          else {
+            parts.push({ type: 'text', content: text })
+            lastTextPartIndex = parts.length - 1
+          }
           updateAssistantMsg()
         }
         else if (eventType === 'tool_call') {
           toolCallCounter++
-          toolCalls.push({
+          const tc: ToolCall = {
             id: `tc-${toolCallCounter}`,
             name: event.name as string,
             args: (event.args as Record<string, unknown>) || {},
             status: 'running',
-          })
+          }
+          toolCalls.push(tc)
+          // 插入到 parts 中对应位置
+          const isOptions = tc.name === 'present_options' && tc.args.options
+          parts.push({ type: isOptions ? 'options' : 'tool_call', toolCall: tc })
           updateAssistantMsg(assistantContent || 'Calling tools...')
         }
         else if (eventType === 'tool_result') {
-          const tc = toolCalls.find(t => t.name === event.name)
+          // 找第一个同名且还在 running 的 tool_call
+          const tc = toolCalls.find(t => t.name === event.name && t.status === 'running')
           if (tc) {
             tc.result = event.result as string
             tc.status = 'completed'
+          }
+          updateAssistantMsg(assistantContent || 'Processing...')
+        }
+        else if (eventType === 'tool_error') {
+          // 工具执行出错
+          const tc = toolCalls.find(t => t.name === event.name && t.status === 'running')
+          if (tc) {
+            tc.result = `${event.error_type}: ${event.error_message}`
+            tc.status = 'error'
           }
           updateAssistantMsg(assistantContent || 'Processing...')
         }
@@ -273,6 +302,15 @@ export function useChat() {
       }
       else {
         assistantContent += `\n\n**Error:** ${err instanceof Error ? err.message : 'Unknown error'}`
+      }
+    }
+
+    // Final update: mark any still-running tools as error (stream ended unexpectedly)
+    for (const tc of toolCalls) {
+      if (tc.status === 'running') {
+        tc.status = 'error'
+        if (!tc.result)
+          tc.result = 'Stream ended before tool completed'
       }
     }
 

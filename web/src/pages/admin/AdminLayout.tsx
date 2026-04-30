@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
-import { NavLink, Outlet } from 'react-router'
 import { ArrowLeft, KeyRound, Shield, Users, Zap } from 'lucide-react'
+import { NavLink, Outlet } from 'react-router'
 import { cn } from '@/lib/utils'
 
 const navItems = [

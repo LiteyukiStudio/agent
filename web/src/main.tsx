@@ -1,8 +1,8 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
+import App from '@/App'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/hooks/useAuth'
-import App from '@/App'
 import '@/lib/i18n'
 import '@/index.css'
 

@@ -3,6 +3,7 @@
 from google.adk.agents.llm_agent import Agent
 
 from model_config import get_model
+from root_agent.callbacks import on_tool_error
 
 from .tools import all_tools
 
@@ -10,6 +11,7 @@ misskey_agent = Agent(
     model=get_model("misskey_agent"),
     name="misskey_agent",
     description="Misskey 社交平台操作助手，可以发帖、查看时间线、搜索用户、管理通知和文件等。",
+    on_tool_error_callback=on_tool_error,
     instruction="""\
 你是轻雪社区（https://lab.liteyuki.org）的 Misskey 社交平台操作助手。
 

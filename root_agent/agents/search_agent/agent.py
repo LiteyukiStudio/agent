@@ -3,6 +3,7 @@
 from google.adk.agents.llm_agent import Agent
 
 from model_config import get_model
+from root_agent.callbacks import on_tool_error
 
 from .tools import all_tools
 
@@ -10,6 +11,7 @@ search_agent = Agent(
     model=get_model("search_agent"),
     name="search_agent",
     description="联网搜索智能体，能够搜索互联网获取最新信息，并高效提取网页正文内容。适用于查询实时信息、技术文档、新闻资讯等场景。",
+    on_tool_error_callback=on_tool_error,
     instruction="""\
 你是一个联网搜索助手，能够搜索互联网并提取网页内容来回答用户问题。
 

@@ -7,5 +7,13 @@
   "selectSession": "选择一个会话或创建新会话以开始",
   "noSessionMessages": "暂无消息",
   "toolCall": "工具调用",
-  "thinking": "思考中..."
+  "thinking": "思考中...",
+  "toolStatus": {
+    "pending": "等待中",
+    "running": "运行中",
+    "completed": "完成",
+    "error": "错误"
+  },
+  "toolCollapse": "{{count}} 个工具调用",
+  "toolCollapseHide": "收起"
 }

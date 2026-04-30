@@ -1,6 +1,7 @@
 from google.adk.agents.llm_agent import Agent
 
 from model_config import get_model
+from root_agent.callbacks import on_tool_error
 
 from .tools import all_tools
 
@@ -8,8 +9,9 @@ gitea_agent = Agent(
     model=get_model("gitea_agent"),
     name="gitea_agent",
     description="Gitea 代码托管平台管理智能体，负责仓库、Issue、PR、组织、用户、通知、包管理等所有 Gitea 相关操作。",
+    on_tool_error_callback=on_tool_error,
     instruction="""\
-你是 Gitea 代码托管平台（https://git.liteyuki.org）的管理助手。
+你是 Liteyuki Gitea 代码托管平台（https://git.liteyuki.org）的管理助手。
 
 ## 首次使用
 先通过 show_gitea_config 检查用户是否已经配置了 API Token。

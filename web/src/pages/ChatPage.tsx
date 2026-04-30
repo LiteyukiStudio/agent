@@ -1,20 +1,27 @@
+import { Menu } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { Menu } from 'lucide-react'
+import { ChatArea } from '@/components/chat/ChatArea'
+import { Sidebar } from '@/components/chat/Sidebar'
 import { Button } from '@/components/ui/button'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
-import { useTitle } from '@/hooks/useTitle'
-import { Sidebar } from '@/components/chat/Sidebar'
-import { ChatArea } from '@/components/chat/ChatArea'
 import { useChat } from '@/hooks/useChat'
+import { useTitle } from '@/hooks/useTitle'
 
 export function ChatPage() {
   const { sessionId } = useParams()
   const navigate = useNavigate()
   const {
-    sessions, activeSession, isLoading,
-    setActiveSession, createSession, deleteSession,
-    renameSession, sendMessage, stopGeneration, togglePublic,
+    sessions,
+    activeSession,
+    isLoading,
+    setActiveSession,
+    createSession,
+    deleteSession,
+    renameSession,
+    sendMessage,
+    stopGeneration,
+    togglePublic,
   } = useChat()
   const [mobileOpen, setMobileOpen] = useState(false)
 
@@ -25,14 +32,14 @@ export function ChatPage() {
     if (sessionId && sessionId !== activeSession?.id) {
       setActiveSession(sessionId)
     }
-  }, [sessionId]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId]) // eslint-disable-line react/exhaustive-deps
 
   // 首页 / 无 sessionId 时，自动跳转到第一个会话
   useEffect(() => {
     if (!sessionId && sessions.length > 0) {
       navigate(`/session/${sessions[0].id}`, { replace: true })
     }
-  }, [sessionId, sessions.length]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [sessionId, sessions.length]) // eslint-disable-line react/exhaustive-deps
 
   function handleSelectSession(id: string) {
     navigate(`/session/${id}`)
@@ -75,13 +82,13 @@ export function ChatPage() {
 
       <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
         <SheetTrigger
-          render={
+          render={(
             <Button
               variant="ghost"
               size="icon"
               className="fixed top-3 left-3 z-40 md:hidden"
             />
-          }
+          )}
         >
           <Menu className="size-5" />
         </SheetTrigger>

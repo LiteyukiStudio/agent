@@ -1,11 +1,11 @@
+import type { Message } from '@/types/chat'
+import { Bot, Globe } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
-import { Bot, Globe } from 'lucide-react'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { MessageBubble } from '@/components/chat/MessageBubble'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { useTitle } from '@/hooks/useTitle'
 import { apiGet } from '@/lib/api'
-import type { Message } from '@/types/chat'
 
 interface PublicSession {
   id: string

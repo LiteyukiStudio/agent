@@ -423,18 +423,36 @@ async def stream_response(
                     # 函数响应
                     if part.function_response:
                         # 更新最近的同名工具调用结果
-                        result_str = str(part.function_response.response) if part.function_response.response else ""
+                        response_data = part.function_response.response
+                        result_str = str(response_data) if response_data else ""
+
+                        # 检测工具是否返回了错误（on_tool_error_callback 包装的结果）
+                        is_tool_error = isinstance(response_data, dict) and response_data.get("error") is True
+
                         for tc in reversed(collected_tool_calls):
                             if tc["name"] == part.function_response.name and "result" not in tc:
                                 tc["result"] = result_str
+                                if is_tool_error:
+                                    tc["error"] = True
                                 break
-                        sse_data = json.dumps(
-                            {
-                                "event": "tool_result",
-                                "name": part.function_response.name,
-                                "result": result_str,
-                            }
-                        )
+
+                        if is_tool_error:
+                            sse_data = json.dumps(
+                                {
+                                    "event": "tool_error",
+                                    "name": part.function_response.name,
+                                    "error_type": response_data.get("error_type", "Error"),
+                                    "error_message": response_data.get("error_message", "Unknown error"),
+                                }
+                            )
+                        else:
+                            sse_data = json.dumps(
+                                {
+                                    "event": "tool_result",
+                                    "name": part.function_response.name,
+                                    "result": result_str,
+                                }
+                            )
                         yield f"data: {sse_data}\n\n"
 
         # 兜底：流结束后从 ADK session state 回写凭据到 UserConfig
@@ -445,7 +463,7 @@ async def stream_response(
             session_id=adk_session_id,
         )
         if final_session:
-            for state_key, state_value in final_session.state.items():
+            for state_key, state_value in final_session.state.to_dict().items():
                 parts = state_key.split("_", 1)
                 if len(parts) == 2 and parts[0] in PERSIST_CREDENTIAL_NAMESPACES and state_value:
                     namespace, key = parts

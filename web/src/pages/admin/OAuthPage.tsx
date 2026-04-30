@@ -1,14 +1,14 @@
+import { Copy, Info, Pencil, Plus, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Copy, Info, Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogClose, DialogContent, DialogDescription, DialogFooter, DialogTitle } from '@/components/ui/dialog'
-import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { useTitle } from '@/hooks/useTitle'
 import { apiDelete, apiGet, apiPatch, apiPost } from '@/lib/api'
 
@@ -46,7 +46,9 @@ export function OAuthPage() {
     apiGet<OAuthProvider[]>('/api/v1/admin/oauth-providers').then(setProviders).catch(() => {})
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   function openCreate() {
     setForm({ ...emptyForm })

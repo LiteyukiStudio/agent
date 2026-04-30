@@ -1,16 +1,16 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router'
 import { Toaster } from 'sonner'
 import { ProtectedRoute } from '@/components/ProtectedRoute'
-import { LoginPage } from '@/pages/LoginPage'
+import { AdminLayout } from '@/pages/admin/AdminLayout'
+import { OAuthPage } from '@/pages/admin/OAuthPage'
+import { QuotaPage } from '@/pages/admin/QuotaPage'
+import { UsersPage } from '@/pages/admin/UsersPage'
 import { ChatPage } from '@/pages/ChatPage'
 import { CliAuthPage } from '@/pages/CliAuthPage'
 import { DeviceAuthPage } from '@/pages/DeviceAuthPage'
+import { LoginPage } from '@/pages/LoginPage'
 import { PublicSessionPage } from '@/pages/PublicSessionPage'
 import { SettingsPage } from '@/pages/SettingsPage'
-import { AdminLayout } from '@/pages/admin/AdminLayout'
-import { UsersPage } from '@/pages/admin/UsersPage'
-import { OAuthPage } from '@/pages/admin/OAuthPage'
-import { QuotaPage } from '@/pages/admin/QuotaPage'
 
 export default function App() {
   return (

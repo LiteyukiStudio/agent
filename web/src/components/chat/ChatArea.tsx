@@ -1,13 +1,13 @@
+import type { Session } from '@/types/chat'
+import { Bot, Copy, Eye, EyeOff, MoreHorizontal } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, Copy, Eye, EyeOff, MoreHorizontal } from 'lucide-react'
 import { toast } from 'sonner'
+import { ChatInput } from '@/components/chat/ChatInput'
+import { MessageBubble } from '@/components/chat/MessageBubble'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { MessageBubble } from '@/components/chat/MessageBubble'
-import { ChatInput } from '@/components/chat/ChatInput'
-import type { Session } from '@/types/chat'
 
 interface ChatAreaProps {
   session: Session | null
@@ -48,6 +48,10 @@ export function ChatArea({ session, isLoading, onSend, onStop, onTogglePublic }:
     toast.success('Share link copied')
   }
 
+  // 判断是否应该显示加载动画（只在还没有 assistant 内容时）
+  const lastMsg = session.messages[session.messages.length - 1]
+  const showLoadingDots = isLoading && !(lastMsg?.role === 'assistant' && (lastMsg.content || lastMsg.toolCalls?.length))
+
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
       {/* Header */}
@@ -55,11 +59,11 @@ export function ChatArea({ session, isLoading, onSend, onStop, onTogglePublic }:
         <h2 className="text-sm font-medium truncate">{session.title}</h2>
         <DropdownMenu>
           <DropdownMenuTrigger
-            render={
+            render={(
               <Button variant="ghost" size="icon" className="size-8 shrink-0">
                 <MoreHorizontal className="size-4" />
               </Button>
-            }
+            )}
           />
           <DropdownMenuContent align="end">
             <DropdownMenuItem
@@ -101,7 +105,7 @@ export function ChatArea({ session, isLoading, onSend, onStop, onTogglePublic }:
           {session.messages.map(msg => (
             <MessageBubble key={msg.id} message={msg} onSend={onSend} onResend={onSend} />
           ))}
-          {isLoading && (
+          {showLoadingDots && (
             <div className="flex gap-3">
               <div className="flex size-8 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900">
                 <Bot className="size-4 text-emerald-700 dark:text-emerald-300" />
