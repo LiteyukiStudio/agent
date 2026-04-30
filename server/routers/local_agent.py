@@ -55,6 +55,8 @@ class DeviceInfo:
 
 _connections: dict[str, dict[str, DeviceInfo]] = {}
 _pending: dict[str, dict[str, asyncio.Future[dict]]] = {}
+# 用户待确认操作：user_id → {request_id → confirm_info}
+_confirmations: dict[str, dict[str, dict]] = {}
 
 
 async def _resolve_user_id(token: str) -> tuple[str | None, str]:
@@ -241,11 +243,40 @@ async def local_agent_websocket(
 
     _connections[user_id][device_id] = DeviceInfo(device_id, device_name, ws, token_id, os)
 
+    # 启动应用层 ping 保活（每 10 秒发一次，防止中间代理超时关闭空闲连接）
+    async def ping_loop() -> None:
+        try:
+            while True:
+                await asyncio.sleep(10)
+                await ws.send_json({"type": "ping"})
+        except Exception:
+            pass
+
+    ping_task = asyncio.create_task(ping_loop())
+
     try:
         while True:
             data = await ws.receive_text()
             try:
                 response = json.loads(data)
+                # 忽略 pong 心跳响应
+                if response.get("type") == "pong":
+                    continue
+                # 确认请求：local_agent 发来需要用户审批的操作
+                if response.get("type") == "confirm_request":
+                    req_id = response.get("id", "")
+                    if user_id not in _confirmations:
+                        _confirmations[user_id] = {}
+                    _confirmations[user_id][req_id] = {
+                        "id": req_id,
+                        "tool": response.get("tool", ""),
+                        "args": response.get("args", {}),
+                        "device_id": device_id,
+                        "device_name": device_name,
+                        "timestamp": __import__("time").time(),
+                    }
+                    logger.info("Confirm request from device=%s: %s %s", device_name, response.get("tool"), req_id[:8])
+                    continue
                 request_id = response.get("id")
                 if request_id and user_id in _pending and request_id in _pending[user_id]:
                     _pending[user_id][request_id].set_result(response)
@@ -256,6 +287,7 @@ async def local_agent_websocket(
     except Exception as e:
         logger.warning("Local agent error: user=%s device=%s err=%s", user_id, device_id[:8], e)
     finally:
+        ping_task.cancel()
         if _connections.get(user_id, {}).get(device_id) and _connections[user_id][device_id].ws is ws:
             del _connections[user_id][device_id]
             if not _connections[user_id]:
@@ -348,3 +380,79 @@ async def remove_device(
     # 从数据库删除设备记录
     await db.delete(dev)
     await db.commit()
+
+
+# ---------------------------------------------------------------------------
+# 确认请求 API（Web 前端审批危险操作）
+# ---------------------------------------------------------------------------
+
+
+@router.get("/api/v1/local-agent/confirmations")
+async def list_confirmations(
+    user: User = Depends(get_current_user),
+) -> dict:
+    """列出当前用户所有待确认的操作请求。"""
+    import time
+
+    confirms = _confirmations.get(user.id, {})
+    # 清理超过 5 分钟的过期请求
+    now = time.time()
+    expired = [k for k, v in confirms.items() if now - v.get("timestamp", 0) > 300]
+    for k in expired:
+        confirms.pop(k, None)
+    return {"confirmations": list(confirms.values())}
+
+
+@router.post("/api/v1/local-agent/confirmations/{request_id}/approve")
+async def approve_confirmation(
+    request_id: str,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """批准一个待确认的操作。"""
+    confirms = _confirmations.get(user.id, {})
+    info = confirms.pop(request_id, None)
+    if not info:
+        raise HTTPException(status_code=404, detail="Confirmation not found or expired")
+
+    # 通过 WS 发送审批结果到对应的 local_agent
+    device_id = info.get("device_id", "")
+    device = _connections.get(user.id, {}).get(device_id)
+    if device:
+        await device.ws.send_json({"type": "confirm_response", "id": request_id, "approved": True})
+    return {"status": "approved"}
+
+
+@router.post("/api/v1/local-agent/confirmations/{request_id}/always")
+async def always_approve_confirmation(
+    request_id: str,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """始终允许：批准操作并告知 local_agent 该会话后续不再询问同类命令。"""
+    confirms = _confirmations.get(user.id, {})
+    info = confirms.pop(request_id, None)
+    if not info:
+        raise HTTPException(status_code=404, detail="Confirmation not found or expired")
+
+    device_id = info.get("device_id", "")
+    device = _connections.get(user.id, {}).get(device_id)
+    if device:
+        await device.ws.send_json({"type": "confirm_response", "id": request_id, "approved": True, "always": True})
+    return {"status": "always_approved"}
+
+
+@router.post("/api/v1/local-agent/confirmations/{request_id}/reject")
+async def reject_confirmation(
+    request_id: str,
+    user: User = Depends(get_current_user),
+) -> dict:
+    """拒绝一个待确认的操作。"""
+    confirms = _confirmations.get(user.id, {})
+    info = confirms.pop(request_id, None)
+    if not info:
+        raise HTTPException(status_code=404, detail="Confirmation not found or expired")
+
+    device_id = info.get("device_id", "")
+    device = _connections.get(user.id, {}).get(device_id)
+    if device:
+        await device.ws.send_json({"type": "confirm_response", "id": request_id, "approved": False})
+    return {"status": "rejected"}

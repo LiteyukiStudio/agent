@@ -39,10 +39,6 @@ export function runDaemon(): void {
         log("INFO", `-> OK (${res.result?.length || 0} chars)`);
       }
     },
-    onConfirmRequired: (_req, _approve, reject) => {
-      log("WARN", "Dangerous operation rejected (daemon mode cannot confirm)");
-      reject();
-    },
   });
 
   const os = getOsType();

@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { ChatInput } from '@/components/chat/ChatInput'
+import { ConfirmationBanner } from '@/components/chat/ConfirmationBanner'
 import { MessageBubble } from '@/components/chat/MessageBubble'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -119,6 +120,8 @@ export function ChatArea({ session, isLoading, onSend, onStop, onTogglePublic }:
               </div>
             </div>
           )}
+          {/* 危险操作确认（内联在消息流中） */}
+          <ConfirmationBanner />
           <div ref={bottomRef} />
         </div>
       </ScrollArea>

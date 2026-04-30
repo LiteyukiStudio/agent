@@ -20,12 +20,44 @@ export interface ToolResponse {
 
 /** 需要用户确认的高危操作 */
 const DANGEROUS_PATTERNS = [
-  /\brm\s+-rf?\b/i,
-  /\bsudo\b/i,
-  /\bmkfs\b/i,
-  /\bdd\s+if=/i,
-  /\bformat\b/i,
-  /\b>\s*\/dev\//i,
+  // ---- 直接危险命令 ----
+  /\brm\s+(-[a-z]*)?.*\//i,             // rm 任何带路径的操作
+  /\brm\s+-rf?\b/i,                      // rm -r / rm -rf
+  /\bsudo\b/i,                           // 提权
+  /\bmkfs\b/i,                           // 格式化文件系统
+  /\bdd\s+if=/i,                         // 磁盘操作
+  /\bformat\b/i,                         // Windows 格式化
+  />\s*\/dev\//,                          // 写入设备文件
+  /\bshutdown\b/i,                       // 关机
+  /\breboot\b/i,                         // 重启
+  /\bsystemctl\s+(stop|disable|mask)\b/i, // 停服务
+  /\bkill\s+-9\b/i,                      // 强制杀进程
+  /\bkillall\b/i,                        // 杀所有进程
+  /\bchmod\s+[0-7]*7[0-7]*\b/,          // 危险权限（含 7）
+  /\bchown\b/i,                          // 改文件属主
+  /\bcrontab\s+-r\b/i,                   // 删除 crontab
+  /\bcurl\b.*\|\s*(ba)?sh\b/i,          // curl pipe to sh
+  /\bwget\b.*\|\s*(ba)?sh\b/i,          // wget pipe to sh
+  /\beval\b/i,                           // shell eval
+  // ---- 防 AI 绕过：通过脚本语言调用系统命令 ----
+  /\bpython[23]?\b.*\b(os\.system|os\.popen|subprocess|shutil\.rmtree|shutil\.move)\b/i,
+  /\bpython[23]?\b.*-c\b/i,             // python -c（任意代码执行）
+  /\bnode\b.*-e\b/i,                     // node -e（任意代码执行）
+  /\bruby\b.*-e\b/i,                     // ruby -e
+  /\bperl\b.*-e\b/i,                     // perl -e
+  /\bos\.system\s*\(/i,                  // os.system() 即使不带 python 前缀
+  /\bsubprocess\.(run|call|Popen)\s*\(/i, // subprocess 调用
+  /\bshutil\.(rmtree|move)\s*\(/i,      // shutil 危险操作
+  /\bexec\s*\(/i,                        // exec()
+  // ---- 包管理器的全局/危险操作 ----
+  /\bnpm\s+(exec|x)\b/i,                // npx 执行任意包
+  /\bpip\s+install\b.*--break-system/i,  // 破坏系统包
+  // ---- 网络下载执行 ----
+  /\bcurl\b.*-[a-z]*o\b/i,              // curl 下载到文件
+  /\bwget\b/i,                           // wget 下载
+  // ---- 危险重定向 ----
+  />\s*\/etc\//,                          // 写 /etc 配置
+  />\s*~\//,                              // 覆盖 home 目录文件
 ];
 
 export function isDangerous(command: string): boolean {

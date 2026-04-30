@@ -56,11 +56,6 @@ export function App() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [input, setInput] = useState("");
   const [isLoggingIn, setIsLoggingIn] = useState(false);
-  const [pendingConfirm, setPendingConfirm] = useState<{
-    request: ToolRequest;
-    approve: () => void;
-    reject: () => void;
-  } | null>(null);
 
   const addLog = useCallback(
     (type: LogEntry["type"], message: string) => {
@@ -88,10 +83,6 @@ export function App() {
           addLog("response", `\u2192 OK (${res.result?.length || 0} chars)`);
         }
       },
-      onConfirmRequired: (req, approve, reject) => {
-        setPendingConfirm({ request: req, approve, reject });
-        addLog("warn", `\u26a0 Dangerous command: ${(req.args.command as string).slice(0, 80)}`);
-      },
     });
 
     // Auto-connect if configured
@@ -109,23 +100,15 @@ export function App() {
       if (update) {
         addLog("warn", `New version available: ${update.current} → ${update.latest}`);
         addLog("warn", `Run: ${update.command}`);
+        if (update.changelog.length > 0) {
+          addLog("info", "Changelog:");
+          for (const line of update.changelog) {
+            addLog("info", `  ${line}`);
+          }
+        }
       }
     });
   }, [addLog]);
-
-  // Handle confirmation with y/n keys
-  useInput((ch, key) => {
-    if (pendingConfirm) {
-      if (ch === "y" || ch === "Y") {
-        pendingConfirm.approve();
-        setPendingConfirm(null);
-      } else if (ch === "n" || ch === "N" || key.escape) {
-        pendingConfirm.reject();
-        setPendingConfirm(null);
-        addLog("info", "Operation rejected by user");
-      }
-    }
-  });
 
   /** 连接到服务器 */
   function doConnect(baseUrl: string, token: string) {
@@ -320,16 +303,6 @@ export function App() {
           </Text>
         ))}
       </Box>
-
-      {/* Confirmation prompt */}
-      {pendingConfirm && (
-        <Box borderStyle="round" borderColor="yellow" paddingX={1}>
-          <Text color="yellow" bold>
-            {"\u26a0"} Confirm dangerous operation? (y/n):{" "}
-          </Text>
-          <Text>{(pendingConfirm.request.args.command as string).slice(0, 60)}</Text>
-        </Box>
-      )}
 
       {/* Input */}
       <Box borderStyle="round" borderColor="gray" paddingX={1}>
