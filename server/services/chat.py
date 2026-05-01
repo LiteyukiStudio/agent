@@ -557,10 +557,11 @@ async def stream_response(
 
                 # 记录用量
                 # 如果模型未返回 token 用量（部分 LLM provider 在流式模式下不上报），
-                # 则根据文本长度进行估算（约 4 字符 ≈ 1 token）以确保计费正常工作。
+                # 则根据 UTF-8 字节长度进行估算（约每 4 字节 ≈ 1 token），
+                # 使用字节长度而非字符长度以更准确地处理多字节字符（如中文）。
                 if total_input_tokens == 0 and total_output_tokens == 0:
-                    total_input_tokens = max(1, len(content) // 4)
-                    total_output_tokens = max(1, len(assistant_text) // 4) if assistant_text else 1
+                    total_input_tokens = max(1, len(content.encode("utf-8")) // 4)
+                    total_output_tokens = max(1, len(assistant_text.encode("utf-8")) // 4) if assistant_text else 1
                     logger.info(
                         "record_usage: no token usage from model, estimating: user=%s input=%d output=%d",
                         user.username,
@@ -633,18 +634,20 @@ async def stream_response(
                         await bg_db.commit()
                     except Exception:
                         logger.warning("Failed to flush assistant message after error")
-                # 异常时也记录已产生的用量（若有）
+                # 异常时也记录已产生的用量，若尚无 token 数据则同样按字节估算
                 try:
-                    if total_input_tokens > 0 or total_output_tokens > 0:
-                        await record_usage(
-                            db=bg_db,
-                            user_id=user.id,
-                            model="agent",
-                            input_tokens=total_input_tokens,
-                            output_tokens=total_output_tokens,
-                            agent_name="root_agent",
-                            session_id=session_id,
-                        )
+                    if total_input_tokens == 0 and total_output_tokens == 0:
+                        total_input_tokens = max(1, len(content.encode("utf-8")) // 4)
+                        total_output_tokens = max(1, len(assistant_text.encode("utf-8")) // 4) if assistant_text else 1
+                    await record_usage(
+                        db=bg_db,
+                        user_id=user.id,
+                        model="agent",
+                        input_tokens=total_input_tokens,
+                        output_tokens=total_output_tokens,
+                        agent_name="root_agent",
+                        session_id=session_id,
+                    )
                 except Exception:
                     logger.warning("Failed to record usage after error")
             finally:
