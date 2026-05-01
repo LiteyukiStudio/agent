@@ -40,6 +40,15 @@ _session_service: BaseSessionService | None = None
 # 新增 Agent 时在这里添加对应的 namespace。
 PERSIST_CREDENTIAL_NAMESPACES: set[str] = {"gitea", "misskey", "memory", "push"}
 
+# Token 估算参数：当 LLM provider 未上报 token 用量时，按字节长度粗略推算。
+# 使用 UTF-8 字节数而非字符数，可更好地适应多字节语言（如中文每字约 3 字节）。
+_BYTES_PER_TOKEN_ESTIMATE = 4
+
+
+def _estimate_tokens(text: str) -> int:
+    """根据 UTF-8 字节长度估算 token 数量（至少 1）。"""
+    return max(1, len(text.encode("utf-8")) // _BYTES_PER_TOKEN_ESTIMATE)
+
 
 def _extract_title_update(response_data: object) -> str | None:
     """从 set_conversation_title 工具响应中提取成功更新后的标题。"""
@@ -557,11 +566,10 @@ async def stream_response(
 
                 # 记录用量
                 # 如果模型未返回 token 用量（部分 LLM provider 在流式模式下不上报），
-                # 则根据 UTF-8 字节长度进行估算（约每 4 字节 ≈ 1 token），
-                # 使用字节长度而非字符长度以更准确地处理多字节字符（如中文）。
+                # 则根据 UTF-8 字节长度进行估算以确保计费正常工作。
                 if total_input_tokens == 0 and total_output_tokens == 0:
-                    total_input_tokens = max(1, len(content.encode("utf-8")) // 4)
-                    total_output_tokens = max(1, len(assistant_text.encode("utf-8")) // 4) if assistant_text else 1
+                    total_input_tokens = _estimate_tokens(content)
+                    total_output_tokens = _estimate_tokens(assistant_text) if assistant_text else 1
                     logger.info(
                         "record_usage: no token usage from model, estimating: user=%s input=%d output=%d",
                         user.username,
@@ -637,8 +645,8 @@ async def stream_response(
                 # 异常时也记录已产生的用量，若尚无 token 数据则同样按字节估算
                 try:
                     if total_input_tokens == 0 and total_output_tokens == 0:
-                        total_input_tokens = max(1, len(content.encode("utf-8")) // 4)
-                        total_output_tokens = max(1, len(assistant_text.encode("utf-8")) // 4) if assistant_text else 1
+                        total_input_tokens = _estimate_tokens(content)
+                        total_output_tokens = _estimate_tokens(assistant_text) if assistant_text else 1
                     await record_usage(
                         db=bg_db,
                         user_id=user.id,
