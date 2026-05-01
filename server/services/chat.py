@@ -383,17 +383,27 @@ async def stream_response(
             assistant_text = ""
             thinking_text = ""
             collected_tool_calls: list[dict] = []
+            collected_parts: list[dict] = []
             has_partial_text = False
             last_flush = asyncio.get_event_loop().time()
+
+            def _append_text_part(part_type: str, text: str) -> None:
+                """追加或合并连续文本类片段，保留刷新后的展示顺序。"""
+                if collected_parts and collected_parts[-1].get("type") == part_type:
+                    collected_parts[-1]["content"] = f"{collected_parts[-1].get('content', '')}{text}"
+                else:
+                    collected_parts.append({"type": part_type, "content": text})
 
             async def _flush_to_db() -> None:
                 """将当前累积的内容写入数据库。"""
                 nonlocal last_flush
                 if bg_assistant_msg and (assistant_text or collected_tool_calls or thinking_text):
                     tool_calls_json = json.dumps(collected_tool_calls) if collected_tool_calls else None
+                    parts_json = json.dumps(collected_parts) if collected_parts else None
                     bg_assistant_msg.content = assistant_text
                     bg_assistant_msg.thinking = thinking_text or None
                     bg_assistant_msg.tool_calls = tool_calls_json
+                    bg_assistant_msg.parts = parts_json
                     await bg_db.commit()
                 last_flush = asyncio.get_event_loop().time()
 
@@ -433,8 +443,10 @@ async def stream_response(
                                     is_thinking = bool(part.thought)
                                     if is_thinking:
                                         thinking_text += text
+                                        _append_text_part("thinking", text)
                                     else:
                                         assistant_text += text
+                                        _append_text_part("text", text)
                                     sse_data = json.dumps(
                                         {
                                             "event": "thinking" if is_thinking else "text",
@@ -449,8 +461,10 @@ async def stream_response(
                                     is_thinking = bool(part.thought)
                                     if is_thinking:
                                         thinking_text += text
+                                        _append_text_part("thinking", text)
                                     else:
                                         assistant_text += text
+                                        _append_text_part("text", text)
                                     sse_data = json.dumps(
                                         {
                                             "event": "thinking" if is_thinking else "text",
@@ -467,6 +481,11 @@ async def stream_response(
                                     "args": dict(part.function_call.args) if part.function_call.args else {},
                                 }
                                 collected_tool_calls.append(tc_data)
+                                is_options_tool = tc_data["name"] == "present_options" and bool(
+                                    tc_data.get("args", {}).get("options"),
+                                )
+                                part_type = "options" if is_options_tool else "tool_call"
+                                collected_parts.append({"type": part_type, "toolCall": tc_data})
                                 sse_data = json.dumps({"event": "tool_call", "author": author, **tc_data})
                                 await queue.put(f"data: {sse_data}\n\n")
 
@@ -551,9 +570,11 @@ async def stream_response(
                 # 最终 flush 消息到数据库
                 if bg_assistant_msg and (assistant_text or collected_tool_calls or thinking_text):
                     tool_calls_json = json.dumps(collected_tool_calls) if collected_tool_calls else None
+                    parts_json = json.dumps(collected_parts) if collected_parts else None
                     bg_assistant_msg.content = assistant_text
                     bg_assistant_msg.thinking = thinking_text or None
                     bg_assistant_msg.tool_calls = tool_calls_json
+                    bg_assistant_msg.parts = parts_json
                     bg_assistant_msg.status = "done"
                     await bg_db.commit()
                 elif bg_assistant_msg and not assistant_text and not collected_tool_calls:
@@ -586,8 +607,11 @@ async def stream_response(
                 if bg_assistant_msg:
                     try:
                         tool_calls_json = json.dumps(collected_tool_calls) if collected_tool_calls else None
+                        parts_json = json.dumps(collected_parts) if collected_parts else None
                         bg_assistant_msg.content = assistant_text or "(生成中断)"
+                        bg_assistant_msg.thinking = thinking_text or None
                         bg_assistant_msg.tool_calls = tool_calls_json
+                        bg_assistant_msg.parts = parts_json
                         bg_assistant_msg.status = "done"
                         await bg_db.commit()
                     except Exception:

@@ -62,6 +62,7 @@ class MessageResponse(_BaseSchema):
     content: str
     thinking: str | None = None
     tool_calls: str | None = None
+    parts: str | None = None
     status: str = "done"
     created_at: datetime
 

@@ -20,6 +20,7 @@ interface ApiMessage {
   content: string
   thinking: string | null
   tool_calls: string | null
+  parts: string | null
   status?: string
   created_at: string
 }
@@ -43,21 +44,41 @@ function parseApiMessages(data: ApiMessage[]): Message[] {
     let toolCalls: ToolCall[] | undefined
     let parts: MessagePart[] | undefined
 
-    if (m.tool_calls || m.thinking) {
+    if (m.parts) {
+      try {
+        const parsedParts = JSON.parse(m.parts) as MessagePart[]
+        parts = parsedParts.map((p, i) => {
+          if (p.type === 'text' || p.type === 'thinking')
+            return { type: p.type, content: p.content }
+          const tc = {
+            ...p.toolCall,
+            id: p.toolCall.id || `tc-${i}`,
+            status: p.toolCall.status || 'completed' as const,
+          }
+          return { type: p.type, toolCall: tc }
+        })
+        toolCalls = parts
+          .filter((p): p is Extract<MessagePart, { type: 'tool_call' | 'options' }> => p.type === 'tool_call' || p.type === 'options')
+          .map(p => p.toolCall)
+      }
+      catch {
+        // fallback to legacy fields below
+      }
+    }
+
+    if (!parts && (m.tool_calls || m.thinking)) {
       try {
         parts = []
 
-        // thinking 放在最前面
+        // 历史数据没有 parts，只能退化为 thinking 在前、正文在后
         if (m.thinking) {
           parts.push({ type: 'thinking', content: m.thinking })
         }
 
-        // 文本内容
         if (m.content) {
           parts.push({ type: 'text', content: m.content })
         }
 
-        // 工具调用
         if (m.tool_calls) {
           const parsed = JSON.parse(m.tool_calls) as Array<{ name: string, args?: Record<string, unknown>, result?: string, error?: boolean }>
           toolCalls = parsed.map((tc, i) => ({
@@ -69,7 +90,6 @@ function parseApiMessages(data: ApiMessage[]): Message[] {
           }))
 
           for (const tc of toolCalls) {
-            // present_options 识别为 options 类型
             if (tc.name === 'present_options' && tc.args.options) {
               parts.push({ type: 'options', toolCall: tc })
             }
