@@ -38,7 +38,7 @@ _session_service: BaseSessionService | None = None
 # Agent 凭据命名空间白名单：工具通过 tool_context.state 写入的这些 namespace 下的 key
 # 会被自动持久化到 UserConfig 表，实现跨会话访问。
 # 新增 Agent 时在这里添加对应的 namespace。
-PERSIST_CREDENTIAL_NAMESPACES: set[str] = {"gitea", "misskey", "memory"}
+PERSIST_CREDENTIAL_NAMESPACES: set[str] = {"gitea", "misskey", "memory", "push"}
 
 
 def _extract_title_update(response_data: object) -> str | None:
