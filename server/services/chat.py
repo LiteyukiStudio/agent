@@ -40,6 +40,15 @@ _session_service: BaseSessionService | None = None
 # 新增 Agent 时在这里添加对应的 namespace。
 PERSIST_CREDENTIAL_NAMESPACES: set[str] = {"gitea", "misskey", "memory", "push"}
 
+# Token 估算参数：当 LLM provider 未上报 token 用量时，按字节长度粗略推算。
+# 使用 UTF-8 字节数而非字符数，可更好地适应多字节语言（如中文每字约 3 字节）。
+_BYTES_PER_TOKEN_ESTIMATE = 4
+
+
+def _estimate_tokens(text: str) -> int:
+    """根据 UTF-8 字节长度估算 token 数量（至少 1）。"""
+    return max(1, len(text.encode("utf-8")) // _BYTES_PER_TOKEN_ESTIMATE)
+
 
 def _extract_title_update(response_data: object) -> str | None:
     """从 set_conversation_title 工具响应中提取成功更新后的标题。"""
@@ -556,16 +565,33 @@ async def stream_response(
                             await set_config(bg_db, user.id, namespace, key, str(state_value), is_secret=is_secret)
 
                 # 记录用量
-                if total_input_tokens > 0 or total_output_tokens > 0:
-                    await record_usage(
-                        db=bg_db,
-                        user_id=user.id,
-                        model="agent",
-                        input_tokens=total_input_tokens,
-                        output_tokens=total_output_tokens,
-                        agent_name="root_agent",
-                        session_id=session_id,
+                # 如果模型未返回 token 用量（部分 LLM provider 在流式模式下不上报），
+                # 则根据 UTF-8 字节长度进行估算以确保计费正常工作。
+                if total_input_tokens == 0 and total_output_tokens == 0:
+                    total_input_tokens = _estimate_tokens(content)
+                    total_output_tokens = _estimate_tokens(assistant_text) if assistant_text else 1
+                    logger.info(
+                        "record_usage: no token usage from model, estimating: user=%s input=%d output=%d",
+                        user.username,
+                        total_input_tokens,
+                        total_output_tokens,
                     )
+                else:
+                    logger.info(
+                        "record_usage: user=%s input=%d output=%d",
+                        user.username,
+                        total_input_tokens,
+                        total_output_tokens,
+                    )
+                await record_usage(
+                    db=bg_db,
+                    user_id=user.id,
+                    model="agent",
+                    input_tokens=total_input_tokens,
+                    output_tokens=total_output_tokens,
+                    agent_name="root_agent",
+                    session_id=session_id,
+                )
 
                 # 最终 flush 消息到数据库
                 if bg_assistant_msg and (assistant_text or collected_tool_calls or thinking_text):
@@ -616,6 +642,22 @@ async def stream_response(
                         await bg_db.commit()
                     except Exception:
                         logger.warning("Failed to flush assistant message after error")
+                # 异常时也记录已产生的用量，若尚无 token 数据则同样按字节估算
+                try:
+                    if total_input_tokens == 0 and total_output_tokens == 0:
+                        total_input_tokens = _estimate_tokens(content)
+                        total_output_tokens = _estimate_tokens(assistant_text) if assistant_text else 1
+                    await record_usage(
+                        db=bg_db,
+                        user_id=user.id,
+                        model="agent",
+                        input_tokens=total_input_tokens,
+                        output_tokens=total_output_tokens,
+                        agent_name="root_agent",
+                        session_id=session_id,
+                    )
+                except Exception:
+                    logger.warning("Failed to record usage after error")
             finally:
                 await queue.put(None)  # 结束信号
 
