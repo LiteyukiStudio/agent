@@ -2,7 +2,7 @@
  * 代码块组件：支持语法高亮、特殊语言渲染（HTML/Mermaid/Markdown）、复制按钮。
  */
 import type { ComponentPropsWithoutRef } from 'react'
-import { Check, ClipboardCopy, Eye, EyeOff } from 'lucide-react'
+import { Check, ClipboardCopy, Eye, EyeOff, Maximize2, X } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -25,6 +25,7 @@ function MermaidRenderer({ code }: { code: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [svg, setSvg] = useState('')
   const [error, setError] = useState('')
+  const [fullscreen, setFullscreen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -44,18 +45,71 @@ function MermaidRenderer({ code }: { code: string }) {
     }
   }, [code])
 
+  // ESC 关闭全屏
+  useEffect(() => {
+    if (!fullscreen)
+      return
+    function handleKey(e: KeyboardEvent) {
+      if (e.key === 'Escape')
+        setFullscreen(false)
+    }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [fullscreen])
+
   if (error)
     return <div className="text-xs text-destructive p-2">{error}</div>
   if (!svg)
     return <div className="text-xs text-muted-foreground p-2 animate-pulse">Rendering diagram...</div>
 
   return (
-    <div
-      ref={containerRef}
-      className="flex justify-center overflow-x-auto py-2"
-      // eslint-disable-next-line react-dom/no-dangerously-set-innerhtml
-      dangerouslySetInnerHTML={{ __html: svg }}
-    />
+    <>
+      <div
+        ref={containerRef}
+        className="relative flex justify-center overflow-x-auto py-2 cursor-pointer group/mermaid"
+        onClick={() => setFullscreen(true)}
+        title="Click to fullscreen"
+      >
+        <button
+          type="button"
+          className="absolute right-2 top-2 z-10 rounded border bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/mermaid:opacity-100"
+          onClick={(e) => {
+            e.stopPropagation()
+            setFullscreen(true)
+          }}
+        >
+          <Maximize2 className="size-3.5" />
+        </button>
+        {/* eslint-disable-next-line react-dom/no-dangerously-set-innerhtml */}
+        <div dangerouslySetInnerHTML={{ __html: svg }} />
+      </div>
+
+      {/* 全屏遮罩 */}
+      {fullscreen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-6"
+          onClick={() => setFullscreen(false)}
+        >
+          <div
+            className="relative max-w-[95vw] max-h-[95vh] overflow-auto rounded-lg bg-background p-6 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setFullscreen(false)}
+              className="absolute right-3 top-3 z-10 rounded-full border bg-background p-1.5 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <X className="size-4" />
+            </button>
+            <div
+              className="flex justify-center [&_svg]:max-w-full [&_svg]:h-auto"
+              // eslint-disable-next-line react-dom/no-dangerously-set-innerhtml
+              dangerouslySetInnerHTML={{ __html: svg }}
+            />
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
