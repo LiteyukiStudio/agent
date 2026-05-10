@@ -6,6 +6,7 @@ import { useTranslation } from 'react-i18next'
 import Markdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { toast } from 'sonner'
+import { CodeBlock } from '@/components/chat/CodeBlock'
 import { ToolCallCard } from '@/components/chat/ToolCallCard'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
@@ -42,37 +43,6 @@ function MarkdownLink({ href, children, ...props }: ComponentPropsWithoutRef<'a'
     )
   }
   return <a href={href} {...props}>{children}</a>
-}
-
-/** 代码块：右上角带复制按钮 */
-function CodeBlock({ children, className, ...props }: ComponentPropsWithoutRef<'code'>) {
-  const [copied, setCopied] = useState(false)
-  const isInline = !className && typeof children === 'string' && !children.includes('\n')
-
-  if (isInline) {
-    return <code className={className} {...props}>{children}</code>
-  }
-
-  const text = typeof children === 'string' ? children : String(children || '').replace(/\n$/, '')
-
-  function handleCopyCode() {
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(setCopied, 2000, false)
-  }
-
-  return (
-    <div className="relative group/code">
-      <button
-        type="button"
-        onClick={handleCopyCode}
-        className="absolute right-2 top-2 z-10 rounded border bg-background/80 p-1 text-muted-foreground opacity-0 transition-opacity hover:text-foreground group-hover/code:opacity-100 active:opacity-100"
-      >
-        {copied ? <Check className="size-3" /> : <ClipboardCopy className="size-3" />}
-      </button>
-      <code className={className} {...props}>{children}</code>
-    </div>
-  )
 }
 
 const markdownComponents = { a: MarkdownLink, code: CodeBlock }
