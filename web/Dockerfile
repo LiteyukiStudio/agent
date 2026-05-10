@@ -12,7 +12,8 @@ WORKDIR /app
 # 复制依赖声明（利用缓存层）
 COPY web/package.json web/pnpm-lock.yaml ./
 
-RUN pnpm install --frozen-lockfile
+# pnpm v10+ 默认拦截含 build script 的依赖，CI 中直接跳过即可
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # 复制源码并构建
 COPY web/ ./
