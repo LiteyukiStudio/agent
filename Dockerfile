@@ -25,7 +25,7 @@ COPY server/ ./server/
 # 安装项目
 RUN uv sync --frozen
 
-EXPOSE 8000
+EXPOSE 8019
 
 # 启动后端（Hypercorn ASGI server）
-CMD ["uv", "run", "hypercorn", "server.main:app", "--bind", "0.0.0.0:8000", "--access-log", "-"]
+CMD ["uv", "run", "hypercorn", "server.main:app", "--bind", "0.0.0.0:8019", "--access-log", "-"]

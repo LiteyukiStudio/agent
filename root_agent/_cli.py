@@ -49,7 +49,7 @@ def server() -> None:
                 "--reload-include",
                 "*.env",
                 "--port",
-                "8000",
+                "8019",
             ]
         )
     )

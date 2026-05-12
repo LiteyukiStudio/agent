@@ -14,7 +14,7 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: process.env.VITE_API_URL || 'http://localhost:8000',
+        target: process.env.VITE_API_URL || 'http://localhost:8019',
         changeOrigin: true,
         // Disable proxy buffering for SSE streaming
         configure: (proxy) => {
@@ -28,7 +28,7 @@ export default defineConfig({
         },
       },
       '/ws': {
-        target: process.env.VITE_API_URL || 'http://localhost:8000',
+        target: process.env.VITE_API_URL || 'http://localhost:8019',
         changeOrigin: true,
         ws: true,
       },

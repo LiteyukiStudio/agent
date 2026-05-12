@@ -34,7 +34,7 @@ pnpm lint
 pnpm lint --fix
 ```
 
-开发模式下，Vite 自动将 `/api` 请求代理到后端 `http://localhost:8000`。
+开发模式下，Vite 自动将 `/api` 请求代理到后端 `http://localhost:8019`。
 
 ## 页面
 

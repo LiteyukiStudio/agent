@@ -109,7 +109,7 @@ def cli() -> None:
     uvicorn.run(
         "server.main:app",
         host="0.0.0.0",
-        port=8000,
+        port=8019,
         reload=True,
         reload_includes=["*.env"],
         log_level="info",

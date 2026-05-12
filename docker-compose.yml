@@ -15,7 +15,7 @@ services:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "8019:8019"
     environment:
       # ---- 必填 ----
       SECRET_KEY: ${SECRET_KEY:?请设置 SECRET_KEY}

@@ -30,7 +30,7 @@ class Settings:
         default_factory=lambda: os.getenv("SECRET_KEY", "change-me-to-a-random-string"),
     )
     server_host: str = field(
-        default_factory=lambda: os.getenv("SERVER_HOST", "http://localhost:8000"),
+        default_factory=lambda: os.getenv("SERVER_HOST", "http://localhost:8019"),
     )
     cors_origins: list[str] = field(
         default_factory=lambda: os.getenv("CORS_ORIGINS", "http://localhost:5173").split(","),
