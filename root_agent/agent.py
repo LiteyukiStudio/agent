@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import json
+import logging
+import os
+
 from google.adk.agents.llm_agent import Agent
 
 from model_config import get_model
@@ -11,6 +15,40 @@ from .agents.push_agent.agent import push_agent
 from .agents.search_agent.agent import search_agent
 from .callbacks import on_tool_error
 from .tools import all_tools as global_tools
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# 全局 MCP 工具加载（环境变量 GLOBAL_MCP_SERVERS 配置）
+# 格式：JSON 数组，每项含 url + 可选 headers/tool_filter/name_prefix
+# 例: [{"url": "http://localhost:8080/sse", "tool_filter": ["search"]}]
+# ---------------------------------------------------------------------------
+
+_global_mcp_tools: list = []
+
+_global_mcp_config = os.getenv("GLOBAL_MCP_SERVERS", "")
+if _global_mcp_config:
+    try:
+        from google.adk.tools.mcp_tool.mcp_session_manager import SseConnectionParams
+        from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
+
+        _mcp_servers = json.loads(_global_mcp_config)
+        for srv in _mcp_servers:
+            mcp_url = srv.get("url", "")
+            if not mcp_url:
+                continue
+            toolset = McpToolset(
+                connection_params=SseConnectionParams(
+                    url=mcp_url,
+                    headers=srv.get("headers", {}),
+                ),
+                tool_filter=srv.get("tool_filter"),
+                tool_name_prefix=srv.get("name_prefix"),
+            )
+            _global_mcp_tools.append(toolset)
+            logger.info("Loaded global MCP server: %s", mcp_url)
+    except Exception:
+        logger.exception("Failed to load global MCP servers from GLOBAL_MCP_SERVERS env")
 
 root_agent = Agent(
     model=get_model("root_agent"),
@@ -80,7 +118,16 @@ liteyuki-agent install  # 设为开机自启
 ```
 
 引导完成后提醒用户在 Local Agent 连接成功后再继续操作。\
-不要在用户未连接时反复尝试调用 local_ 工具。""",
-    tools=global_tools,
+不要在用户未连接时反复尝试调用 local_ 工具。
+
+## MCP 工具（外部服务扩展）
+用户可以配置自己的 MCP 服务器来扩展你的能力。使用方式：
+1. **配置**：使用 setup_mcp 工具添加用户的 MCP 服务器（需要 URL 和可选的认证 headers）
+2. **查看**：使用 mcp_list_servers 列出已配置的服务器，mcp_list_tools 查看某个服务器的工具
+3. **调用**：使用 mcp_call_tool 调用服务器上的具体工具
+4. **移除**：使用 remove_mcp 移除不需要的服务器
+
+每个用户的 MCP 配置互相隔离，互不可见。""",
+    tools=[*global_tools, *_global_mcp_tools],
     sub_agents=[gitea_agent, misskey_agent, push_agent, search_agent, image_agent],
 )

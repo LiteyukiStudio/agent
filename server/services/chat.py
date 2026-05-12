@@ -38,7 +38,7 @@ _session_service: BaseSessionService | None = None
 # Agent 凭据命名空间白名单：工具通过 tool_context.state 写入的这些 namespace 下的 key
 # 会被自动持久化到 UserConfig 表，实现跨会话访问。
 # 新增 Agent 时在这里添加对应的 namespace。
-PERSIST_CREDENTIAL_NAMESPACES: set[str] = {"gitea", "misskey", "memory", "push"}
+PERSIST_CREDENTIAL_NAMESPACES: set[str] = {"gitea", "misskey", "memory", "push", "mcp"}
 
 # Token 估算参数：当 LLM provider 未上报 token 用量时，按字节长度粗略推算。
 # 使用 UTF-8 字节数而非字符数，可更好地适应多字节语言（如中文每字约 3 字节）。
