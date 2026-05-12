@@ -129,7 +129,9 @@ async def send_message(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
 
     return StreamingResponse(
-        chat_service.stream_response(user, chat_session.adk_session_id, body.content, db, session_id),
+        chat_service.stream_response(
+            user, chat_session.adk_session_id, body.content, db, session_id, images=body.images
+        ),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",

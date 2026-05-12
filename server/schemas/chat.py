@@ -47,10 +47,18 @@ class SessionUpdate(BaseModel):
     is_public: bool | None = None
 
 
+class ImageAttachment(BaseModel):
+    """用户发送的图片附件（base64 编码）。"""
+
+    data: str
+    mime_type: str = "image/png"
+
+
 class MessageSend(BaseModel):
     """向 Agent 发送消息的请求体。"""
 
     content: str
+    images: list[ImageAttachment] | None = None
 
 
 class MessageResponse(_BaseSchema):

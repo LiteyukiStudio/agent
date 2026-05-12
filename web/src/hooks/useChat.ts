@@ -291,17 +291,33 @@ export function useChat() {
     }
   }, [])
 
-  const sendMessage = useCallback(async (content: string) => {
-    if (!activeSessionId || !content.trim() || loadingSessionIds.has(activeSessionId))
+  const sendMessage = useCallback(async (content: string, images?: File[]) => {
+    if (!activeSessionId || (!content.trim() && (!images || images.length === 0)) || loadingSessionIds.has(activeSessionId))
       return
 
     const sid = activeSessionId
+
+    // 将 File[] 转为 base64 编码的附件数组
+    let imageData: Array<{ data: string, mime_type: string }> | undefined
+    if (images && images.length > 0) {
+      imageData = await Promise.all(images.map(async (file) => {
+        const buffer = await file.arrayBuffer()
+        const bytes = new Uint8Array(buffer)
+        let binary = ''
+        for (let i = 0; i < bytes.length; i++) {
+          binary += String.fromCharCode(bytes[i])
+        }
+        const base64 = btoa(binary)
+        return { data: base64, mime_type: file.type || 'image/png' }
+      }))
+    }
 
     const userMsg: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
       content: content.trim(),
       timestamp: new Date(),
+      images: imageData,
     }
 
     setMessagesBySession((prev) => {
@@ -352,7 +368,7 @@ export function useChat() {
     }
 
     try {
-      for await (const event of streamSSE(`/api/v1/chat/sessions/${sid}/messages`, { content: content.trim() }, abortController.signal)) {
+      for await (const event of streamSSE(`/api/v1/chat/sessions/${sid}/messages`, { content: content.trim(), images: imageData }, abortController.signal)) {
         const eventType = event.event as string
 
         if (eventType === 'thinking') {

@@ -13,7 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 interface ChatAreaProps {
   session: Session | null
   isLoading: boolean
-  onSend: (content: string) => void
+  onSend: (content: string, images?: File[]) => void
   onStop?: () => void
   onTogglePublic?: (sessionId: string) => void
 }

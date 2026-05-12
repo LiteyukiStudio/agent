@@ -21,6 +21,7 @@ dependencies = [
     "psycopg2-binary>=2.9.12",
     "trafilatura>=2.0",
     "ddgs>=9.14.1",
+    "Pillow>=10.0",
 ]
 
 [dependency-groups]

@@ -18,5 +18,8 @@
     "error": "エラー"
   },
   "toolCollapse": "{{count}} 件のツール呼び出し",
-  "toolCollapseHide": "折りたたむ"
+  "toolCollapseHide": "折りたたむ",
+  "attachImage": "画像を添付",
+  "imageTooBig": "画像が大きすぎます（最大 {{max}}MB）",
+  "imageLimitReached": "最大 {{max}} 枚まで添付可能"
 }

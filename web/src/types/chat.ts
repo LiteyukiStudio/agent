@@ -21,6 +21,8 @@ export interface Message {
   toolCalls?: ToolCall[]
   /** 交错排列的消息片段（文本 + 工具调用），按时间顺序 */
   parts?: MessagePart[]
+  /** 用户消息附带的图片（base64 编码） */
+  images?: Array<{ data: string, mime_type: string }>
 }
 
 export interface Session {

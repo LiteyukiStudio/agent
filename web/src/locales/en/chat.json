@@ -18,5 +18,8 @@
     "error": "Error"
   },
   "toolCollapse": "{{count}} tool calls",
-  "toolCollapseHide": "Collapse"
+  "toolCollapseHide": "Collapse",
+  "attachImage": "Attach image",
+  "imageTooBig": "Image too large (max {{max}}MB)",
+  "imageLimitReached": "Max {{max}} images allowed"
 }

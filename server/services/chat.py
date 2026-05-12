@@ -290,6 +290,7 @@ async def stream_response(
     content: str,
     db: AsyncSession,
     session_id: str | None = None,
+    images: list | None = None,
 ) -> AsyncGenerator[str]:
     """向 ADK Agent 发送消息并生成 SSE 格式的事件。
 
@@ -338,9 +339,29 @@ async def stream_response(
         await save_message(db, session_id, "user", content)
 
     runner = get_runner()
+
+    # 构造多模态消息（文本 + 图片）
+    message_parts: list[types.Part] = []
+    if content.strip():
+        message_parts.append(types.Part(text=content))
+    if images:
+        import base64 as b64_module
+
+        for img_attachment in images:
+            try:
+                img_bytes = b64_module.b64decode(img_attachment.data)
+                message_parts.append(
+                    types.Part(inline_data=types.Blob(mime_type=img_attachment.mime_type, data=img_bytes))
+                )
+            except Exception:
+                logger.warning("Failed to decode image attachment, skipping")
+    # 至少有一个 part
+    if not message_parts:
+        message_parts.append(types.Part(text=content or " "))
+
     message = types.Content(
         role="user",
-        parts=[types.Part(text=content)],
+        parts=message_parts,
     )
 
     # 预创建助手消息（流开始前就写入数据库，中途刷新不丢失）

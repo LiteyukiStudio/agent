@@ -443,7 +443,22 @@ export function MessageBubble({ message, onRegenerate, onResend, onSend, readOnl
         >
           {isUser
             ? (
-                <p className="whitespace-pre-wrap">{message.content}</p>
+                <>
+                  {message.images && message.images.length > 0 && (
+                    <div className="mb-2 flex flex-wrap gap-2">
+                      {message.images.map((img, i) => (
+                        <img
+                          // eslint-disable-next-line react/no-array-index-key
+                          key={i}
+                          src={`data:${img.mime_type};base64,${img.data}`}
+                          alt=""
+                          className="max-h-48 max-w-full rounded-lg object-contain"
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {message.content && <p className="whitespace-pre-wrap">{message.content}</p>}
+                </>
               )
             : (
                 <>
