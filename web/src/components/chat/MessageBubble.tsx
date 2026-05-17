@@ -264,6 +264,7 @@ function OptionsBlock({ question, options, mode = 'single', icons, onSend }: {
 }
 
 function QuestionnaireBlock({ questions, onSend }: { questions: OptionQuestion[], onSend?: (content: string) => void }) {
+  const { t } = useTranslation('chat')
   const [answers, setAnswers] = useState<Record<number, string>>({})
   const [submitted, setSubmitted] = useState(false)
   const answeredCount = Object.keys(answers).length
@@ -283,7 +284,7 @@ function QuestionnaireBlock({ questions, onSend }: { questions: OptionQuestion[]
     <div className="my-2 space-y-3 max-w-full overflow-hidden">
       {questions.map((q, idx) => (
         <div key={`question-${idx}`} className="rounded-lg border p-3">
-          <p className="mb-2 text-sm font-medium">{`问题 ${idx + 1}`}</p>
+          <p className="mb-2 text-sm font-medium">{t('questionnaireQuestion', { index: idx + 1 })}</p>
           <OptionsBlock
             question={q.question}
             options={q.options}
@@ -303,7 +304,7 @@ function QuestionnaireBlock({ questions, onSend }: { questions: OptionQuestion[]
         disabled={submitted || answeredCount < total}
         onClick={handleSubmitAll}
       >
-        {`提交全部答案 (${answeredCount}/${total})`}
+        {t('questionnaireSubmitAll', { answered: answeredCount, total })}
       </Button>
     </div>
   )

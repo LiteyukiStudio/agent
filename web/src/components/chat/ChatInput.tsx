@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import { ArrowUp, ImagePlus, Square, X } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -21,17 +21,19 @@ export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProp
   const { t: tc } = useTranslation('common')
   const [value, setValue] = useState('')
   const [attachedImages, setAttachedImages] = useState<File[]>([])
+  const [previewUrls, setPreviewUrls] = useState<string[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const previewUrls = useMemo(() => attachedImages.map(file => URL.createObjectURL(file)), [attachedImages])
 
   useEffect(() => {
+    const urls = attachedImages.map(file => URL.createObjectURL(file))
+    setPreviewUrls(urls)
     return () => {
-      for (const url of previewUrls) {
+      for (const url of urls) {
         URL.revokeObjectURL(url)
       }
     }
-  }, [previewUrls])
+  }, [attachedImages])
 
   const addImages = useCallback((files: File[]) => {
     const validFiles: File[] = []

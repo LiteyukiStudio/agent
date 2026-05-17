@@ -31,17 +31,17 @@ function fileToBase64(file: File): Promise<string> {
     reader.onload = () => {
       const result = reader.result
       if (typeof result !== 'string') {
-        reject(new Error('Failed to read file'))
+        reject(new Error(`Failed to read file: ${file.name}`))
         return
       }
       const commaIndex = result.indexOf(',')
       if (commaIndex < 0) {
-        reject(new Error('Invalid file data'))
+        reject(new Error(`Invalid data URL format (missing comma): ${file.name}`))
         return
       }
       resolve(result.slice(commaIndex + 1))
     }
-    reader.onerror = () => reject(reader.error || new Error('Failed to read file'))
+    reader.onerror = () => reject(reader.error || new Error(`Failed to read file: ${file.name}`))
     reader.readAsDataURL(file)
   })
 }

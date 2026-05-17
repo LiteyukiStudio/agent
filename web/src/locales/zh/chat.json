@@ -21,5 +21,7 @@
   "toolCollapseHide": "收起",
   "attachImage": "添加图片",
   "imageTooBig": "图片过大（最大 {{max}}MB）",
-  "imageLimitReached": "最多附加 {{max}} 张图片"
+  "imageLimitReached": "最多附加 {{max}} 张图片",
+  "questionnaireQuestion": "问题 {{index}}",
+  "questionnaireSubmitAll": "提交全部答案 ({{answered}}/{{total}})"
 }
