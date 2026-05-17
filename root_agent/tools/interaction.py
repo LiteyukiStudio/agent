@@ -8,15 +8,16 @@ def present_options(
     options: list[str],
     mode: str = "single",
     icons: list[str] | None = None,
+    questions: list[dict] | None = None,
 ) -> str:
     """向用户展示可点击的选项，等待用户做出选择。
 
-    当你需要用户在多个选项中做出明确选择时使用此工具。
+    当你需要用户输入选择（而不是开放式聊天）时，都应优先使用此工具。
     调用后不要自行假设用户的选择，等待用户实际点击后再继续。
 
     Args:
-        question: 要询问用户的问题，简明扼要。
-        options: 可供选择的选项列表，每个选项是一个简短字符串，2-6 个选项为佳。
+        question: 要询问用户的问题，简明扼要。多题模式下可为空字符串。
+        options: 单题模式下的可选项列表，每个选项是一个简短字符串，2-6 个选项为佳。
         mode: 选择模式：
             - "single"：单选，用户只能选一个选项（默认）。
             - "multiple"：多选，用户可以选择多个选项后提交。
@@ -50,8 +51,16 @@ def present_options(
             **重要**：对于知名技术品牌和工具，务必使用 https://cdn.simpleicons.org/{name}
             格式的图标 URL（Simple Icons 是开源图标库，覆盖 3000+ 品牌图标）。
             品牌名全小写、无空格，参考 https://simpleicons.org 查看支持列表。
+        questions: 多题模式（可选）。传入后前端会渲染为问卷，用户可全部作答后一次提交。
+            每一题支持字段：
+            - question: 题目文本（必填）
+            - options: 该题选项列表（可为空，配合 free 模式）
+            - mode: "single" | "multiple" | "free"（默认 single）
+            - icons: 该题图标列表（可选）
 
     Returns:
         提示信息，表示正在等待用户选择。
     """
+    if questions:
+        return f"已向用户展示 {len(questions)} 道题目，等待用户作答中..."
     return f"已向用户展示 {len(options)} 个选项（模式: {mode}），等待选择中..."

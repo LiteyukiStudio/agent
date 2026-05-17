@@ -6,6 +6,7 @@ from google.adk.agents.llm_agent import Agent
 
 from model_config import get_model
 from root_agent.callbacks import on_tool_error
+from root_agent.global_tools import all_tools as global_tools
 
 from .tools import all_tools
 
@@ -69,5 +70,5 @@ push_agent = Agent(
 - 配置信息中的密码、token 等敏感字段，展示时必须脱敏（用 *** 替代）
 - 遇到错误时给出具体解决建议
 """,
-    tools=all_tools,
+    tools=[*global_tools, *all_tools],
 )

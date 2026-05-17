@@ -14,7 +14,7 @@ from .agents.misskey_agent.agent import misskey_agent
 from .agents.push_agent.agent import push_agent
 from .agents.search_agent.agent import search_agent
 from .callbacks import on_tool_error
-from .tools import all_tools as global_tools
+from .global_tools import all_tools as global_tools
 
 logger = logging.getLogger(__name__)
 
@@ -89,7 +89,7 @@ root_agent = Agent(
     instruction="""\
 回答用户的问题，并根据需要调用其他智能体来完成任务。\
 当用户的问题需要查询最新信息、实时数据或你不确定的事实时，交给 search_agent 处理。\
-当需要用户在多个选项中做出选择时，使用 present_options 工具展示可点击的按钮。\
+当需要用户进行选择输入（单选、多选、自由输入、问卷多题）时，必须优先使用 present_options 工具展示可点击选项。\
 
 ## 本地设备操作
 当需要操作用户的本地设备（执行命令、读写文件等）时：

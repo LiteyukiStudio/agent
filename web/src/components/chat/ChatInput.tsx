@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import { ArrowUp, ImagePlus, Square, X } from 'lucide-react'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -21,8 +21,19 @@ export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProp
   const { t: tc } = useTranslation('common')
   const [value, setValue] = useState('')
   const [attachedImages, setAttachedImages] = useState<File[]>([])
+  const [previewUrls, setPreviewUrls] = useState<string[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    const urls = attachedImages.map(file => URL.createObjectURL(file))
+    setPreviewUrls(urls)
+    return () => {
+      for (const url of urls) {
+        URL.revokeObjectURL(url)
+      }
+    }
+  }, [attachedImages])
 
   const addImages = useCallback((files: File[]) => {
     const validFiles: File[] = []
@@ -105,10 +116,9 @@ export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProp
         {attachedImages.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {attachedImages.map((file, i) => (
-              // eslint-disable-next-line react/no-array-index-key
-              <div key={i} className="group relative">
+              <div key={`${file.name}-${file.lastModified}-${file.size}-${i}`} className="group relative">
                 <img
-                  src={URL.createObjectURL(file)}
+                  src={previewUrls[i]}
                   alt=""
                   className="size-16 rounded-lg border object-cover"
                 />
@@ -155,6 +165,13 @@ export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProp
               onChange={e => setValue(e.target.value)}
               onKeyDown={handleKeyDown}
               onPaste={handlePaste}
+              onDragOver={e => e.preventDefault()}
+              onDrop={(e) => {
+                e.preventDefault()
+                const files = Array.from(e.dataTransfer.files || [])
+                if (files.length > 0)
+                  addImages(files)
+              }}
               placeholder={placeholder}
               className="min-h-[48px] max-h-[200px] resize-none py-3 pr-4 text-base leading-6"
               rows={1}
