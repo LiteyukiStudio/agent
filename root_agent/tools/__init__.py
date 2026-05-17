@@ -1,6 +1,5 @@
 """全局工具：为所有 Agent 提供用户交互、记忆和本地操作能力。"""
 
-from ..agents.search_agent.tools import all_tools as search_tools
 from .conversation import all_tools as conversation_tools
 from .datetime_tools import all_tools as datetime_tools
 from .interaction import present_options
@@ -13,7 +12,6 @@ all_tools: list = [
     present_options,
     *conversation_tools,
     *datetime_tools,
-    *search_tools,
     *memory_tools,
     *local_agent_tools,
     *user_info_tools,

@@ -2,7 +2,7 @@ from google.adk.agents.llm_agent import Agent
 
 from model_config import get_model
 from root_agent.callbacks import on_tool_error
-from root_agent.tools import all_tools as global_tools
+from root_agent.global_tools import all_tools as global_tools
 
 from .tools import all_tools
 

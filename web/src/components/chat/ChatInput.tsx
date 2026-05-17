@@ -113,9 +113,8 @@ export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProp
       <div className="mx-auto max-w-3xl">
         {attachedImages.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
-            {attachedImages.map((_, i) => (
-              // eslint-disable-next-line react/no-array-index-key
-              <div key={i} className="group relative">
+            {attachedImages.map((file, i) => (
+              <div key={`${file.name}-${i}`} className="group relative">
                 <img
                   src={previewUrls[i]}
                   alt=""

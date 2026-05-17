@@ -282,7 +282,7 @@ function QuestionnaireBlock({ questions, onSend }: { questions: OptionQuestion[]
   return (
     <div className="my-2 space-y-3 max-w-full overflow-hidden">
       {questions.map((q, idx) => (
-        <div key={`${q.question}-${idx}`} className="rounded-lg border p-3">
+        <div key={`question-${idx}`} className="rounded-lg border p-3">
           <p className="mb-2 text-sm font-medium">{`问题 ${idx + 1}`}</p>
           <OptionsBlock
             question={q.question}
@@ -303,11 +303,7 @@ function QuestionnaireBlock({ questions, onSend }: { questions: OptionQuestion[]
         disabled={submitted || answeredCount < total}
         onClick={handleSubmitAll}
       >
-        提交全部答案 (
-        {answeredCount}
-        /
-        {total}
-        )
+        {`提交全部答案 (${answeredCount}/${total})`}
       </Button>
     </div>
   )

@@ -14,7 +14,7 @@ from .agents.misskey_agent.agent import misskey_agent
 from .agents.push_agent.agent import push_agent
 from .agents.search_agent.agent import search_agent
 from .callbacks import on_tool_error
-from .tools import all_tools as global_tools
+from .global_tools import all_tools as global_tools
 
 logger = logging.getLogger(__name__)
 
