@@ -23,5 +23,6 @@
   "imageTooBig": "图片过大（最大 {{max}}MB）",
   "imageLimitReached": "最多附加 {{max}} 张图片",
   "questionnaireQuestion": "问题 {{index}}",
-  "questionnaireSubmitAll": "提交全部答案 ({{answered}}/{{total}})"
+  "questionnaireSubmitAll": "提交全部答案 ({{answered}}/{{total}})",
+  "questionnaireAnswerLabel": "回答："
 }

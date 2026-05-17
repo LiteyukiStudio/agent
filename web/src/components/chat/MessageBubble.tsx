@@ -275,7 +275,7 @@ function QuestionnaireBlock({ questions, onSend }: { questions: OptionQuestion[]
       return
     setSubmitted(true)
     const content = questions
-      .map((q, idx) => `${q.question}\n回答：${answers[idx] || ''}`)
+      .map((q, idx) => `${q.question}\n${t('questionnaireAnswerLabel')}${answers[idx] || ''}`)
       .join('\n\n')
     onSend?.(content)
   }

@@ -23,5 +23,6 @@
   "imageTooBig": "画像が大きすぎます（最大 {{max}}MB）",
   "imageLimitReached": "最大 {{max}} 枚まで添付可能",
   "questionnaireQuestion": "質問 {{index}}",
-  "questionnaireSubmitAll": "すべての回答を送信 ({{answered}}/{{total}})"
+  "questionnaireSubmitAll": "すべての回答を送信 ({{answered}}/{{total}})",
+  "questionnaireAnswerLabel": "回答："
 }

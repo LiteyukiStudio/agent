@@ -116,7 +116,7 @@ export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProp
         {attachedImages.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {attachedImages.map((file, i) => (
-              <div key={`${file.name}-${i}`} className="group relative">
+              <div key={`${file.name}-${file.lastModified}-${file.size}-${i}`} className="group relative">
                 <img
                   src={previewUrls[i]}
                   alt=""

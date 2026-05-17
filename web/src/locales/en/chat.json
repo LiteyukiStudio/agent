@@ -23,5 +23,6 @@
   "imageTooBig": "Image too large (max {{max}}MB)",
   "imageLimitReached": "Max {{max}} images allowed",
   "questionnaireQuestion": "Question {{index}}",
-  "questionnaireSubmitAll": "Submit all answers ({{answered}}/{{total}})"
+  "questionnaireSubmitAll": "Submit all answers ({{answered}}/{{total}})",
+  "questionnaireAnswerLabel": "Answer: "
 }
