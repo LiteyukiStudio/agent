@@ -4,6 +4,7 @@ from google.adk.agents.llm_agent import Agent
 
 from model_config import get_model
 from root_agent.callbacks import on_tool_error
+from root_agent.tools import all_tools as global_tools
 
 from .tools import all_tools
 
@@ -67,5 +68,5 @@ https://lab.liteyuki.org/settings/api（一定要生成可点击链接），\
 - **MFM**：Misskey Flavored Markdown，支持特殊排版语法
 - **Visibility**：public（公开）、home（首页可见）、followers（仅关注者）、specified（指定用户）
 """,
-    tools=all_tools,
+    tools=[*global_tools, *all_tools],
 )
