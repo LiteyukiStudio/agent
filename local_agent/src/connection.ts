@@ -172,7 +172,7 @@ function resetSessionApprovalState(): void {
 }
 
 function getChatSessionId(request: ToolRequest): string | null {
-  const sessionId = request.args.__chat_session_id;
+  const sessionId = request.args?.__chat_session_id;
   return typeof sessionId === "string" && sessionId.length > 0 ? sessionId : null;
 }
 
@@ -223,13 +223,13 @@ async function handleRequest(request: ToolRequest): Promise<void> {
   const command = typeof request.args.command === "string" ? request.args.command : "";
   const isSudoCommand = request.tool === "run_command" && needsSudo(command);
   const chatSessionId = getChatSessionId(request);
-  const approvedForThisChatSession = !!chatSessionId && alwaysApproveChatSessionIds.has(chatSessionId);
+  const isSessionApproved = !!chatSessionId && alwaysApproveChatSessionIds.has(chatSessionId);
 
   // Check if dangerous — skip confirmation if autoApprove or sessionAlwaysApprove is on
   if (
     !autoApprove &&
     !sessionAlwaysApprove &&
-    !approvedForThisChatSession &&
+    !isSessionApproved &&
     request.tool === "run_command" &&
     isDangerous(command)
   ) {
