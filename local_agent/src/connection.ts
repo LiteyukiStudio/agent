@@ -51,11 +51,13 @@ export function connect(url: string, token: string): void {
   currentUrl = url;
   currentToken = token;
   shouldReconnect = true;
+  resetSessionApprovalState();
   doConnect();
 }
 
 export function disconnect(): void {
   shouldReconnect = false;
+  resetSessionApprovalState();
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -157,9 +159,22 @@ const pendingConfirms: Map<string, {
 
 // 本次会话是否已启用「始终允许」模式（连接断开后重置）
 let sessionAlwaysApprove = false;
+// 记录启用「始终允许」的聊天会话 ID（仅对应会话生效）
+const alwaysApproveChatSessionIds = new Set<string>();
 
 // 本次会话缓存的 sudo 密码（连接断开后清空，绝不写盘）
 let cachedSudoPassword: string | null = null;
+
+function resetSessionApprovalState(): void {
+  sessionAlwaysApprove = false;
+  alwaysApproveChatSessionIds.clear();
+  cachedSudoPassword = null;
+}
+
+function getChatSessionId(request: ToolRequest): string | null {
+  const sessionId = request.args.__chat_session_id;
+  return typeof sessionId === "string" && sessionId.length > 0 ? sessionId : null;
+}
 
 /** 处理服务端发来的确认响应 */
 export function handleConfirmResponse(id: string, approved: boolean, always?: boolean, password?: string): void {
@@ -207,11 +222,14 @@ function needsSudo(command: string): boolean {
 async function handleRequest(request: ToolRequest): Promise<void> {
   const command = typeof request.args.command === "string" ? request.args.command : "";
   const isSudoCommand = request.tool === "run_command" && needsSudo(command);
+  const chatSessionId = getChatSessionId(request);
+  const approvedForThisChatSession = !!chatSessionId && alwaysApproveChatSessionIds.has(chatSessionId);
 
   // Check if dangerous — skip confirmation if autoApprove or sessionAlwaysApprove is on
   if (
     !autoApprove &&
     !sessionAlwaysApprove &&
+    !approvedForThisChatSession &&
     request.tool === "run_command" &&
     isDangerous(command)
   ) {
@@ -222,7 +240,11 @@ async function handleRequest(request: ToolRequest): Promise<void> {
     const result = await requestWebConfirmation(request, requirePassword);
     if (result.action === "always") {
       // 「始终允许」：本次会话后续所有命令都跳过确认
-      sessionAlwaysApprove = true;
+      if (chatSessionId) {
+        alwaysApproveChatSessionIds.add(chatSessionId);
+      } else {
+        sessionAlwaysApprove = true;
+      }
       if (result.password) {
         cachedSudoPassword = result.password;
       }
