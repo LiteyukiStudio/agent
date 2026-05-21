@@ -22,6 +22,14 @@ interface MessageBubbleProps {
   readOnly?: boolean
 }
 
+type OptionMode = 'single' | 'multiple' | 'free'
+interface OptionQuestion {
+  question: string
+  options: string[]
+  mode?: OptionMode
+  icons?: (string | null)[]
+}
+
 const markdownClasses = 'prose prose-sm dark:prose-invert max-w-none break-words overflow-hidden [&_table]:text-xs [&_table]:w-full [&_table]:border-collapse [&_table]:block [&_table]:overflow-x-auto [&_th]:border [&_th]:border-border [&_th]:px-2 [&_th]:py-1 [&_th]:bg-muted [&_td]:border [&_td]:border-border [&_td]:px-2 [&_td]:py-1 [&_pre]:bg-background [&_pre]:text-xs [&_pre]:overflow-x-auto [&_pre]:max-w-full [&_code]:text-xs [&_code]:break-all [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1 [&_li]:my-0.5 [&_h1]:text-base [&_h2]:text-sm [&_h3]:text-sm [&_table]:my-2'
 
 // External links: primary color + icon + new tab; internal links: default
@@ -99,7 +107,7 @@ function ThinkingBlock({ content }: { content: string }) {
 function OptionsBlock({ question, options, mode = 'single', icons, onSend }: {
   question?: string
   options: string[]
-  mode?: 'single' | 'multiple' | 'free'
+  mode?: OptionMode
   icons?: (string | null)[]
   onSend?: (content: string) => void
 }) {
@@ -255,6 +263,53 @@ function OptionsBlock({ question, options, mode = 'single', icons, onSend }: {
   )
 }
 
+function QuestionnaireBlock({ questions, onSend }: { questions: OptionQuestion[], onSend?: (content: string) => void }) {
+  const { t } = useTranslation('chat')
+  const [answers, setAnswers] = useState<Record<number, string>>({})
+  const [submitted, setSubmitted] = useState(false)
+  const answeredCount = Object.keys(answers).length
+  const total = questions.length
+
+  function handleSubmitAll() {
+    if (submitted || answeredCount < total)
+      return
+    setSubmitted(true)
+    const content = questions
+      .map((q, idx) => `${q.question}\n${t('questionnaireAnswerLabel')}${answers[idx] || ''}`)
+      .join('\n\n')
+    onSend?.(content)
+  }
+
+  return (
+    <div className="my-2 space-y-3 max-w-full overflow-hidden">
+      {questions.map((q, idx) => (
+        <div key={`question-${idx}`} className="rounded-lg border p-3">
+          <p className="mb-2 text-sm font-medium">{t('questionnaireQuestion', { index: idx + 1 })}</p>
+          <OptionsBlock
+            question={q.question}
+            options={q.options}
+            mode={q.mode || 'single'}
+            icons={q.icons}
+            onSend={(answer) => {
+              if (submitted)
+                return
+              setAnswers(prev => ({ ...prev, [idx]: answer }))
+            }}
+          />
+        </div>
+      ))}
+      <Button
+        size="sm"
+        className="rounded-full"
+        disabled={submitted || answeredCount < total}
+        onClick={handleSubmitAll}
+      >
+        {t('questionnaireSubmitAll', { answered: answeredCount, total })}
+      </Button>
+    </div>
+  )
+}
+
 const TOOL_CALLS_COLLAPSE_THRESHOLD = 3
 const INTERNAL_TOOLS = new Set(['set_conversation_title', 'recall_memories', 'remember_user', 'forget_user'])
 
@@ -383,10 +438,16 @@ function InterleavedParts({ parts, onSend, showInternalTools }: { parts: Message
         }
         if (group.type === 'options') {
           const tc = group.toolCall
-          const options = tc.args.options as string[]
+          const options = (tc.args.options as string[] | undefined) || []
           const question = tc.args.question as string | undefined
-          const mode = (tc.args.mode as 'single' | 'multiple' | 'free') || 'single'
+          const mode = (tc.args.mode as OptionMode) || 'single'
           const icons = (tc.args.icons as (string | null)[] | undefined) || undefined
+          const questions = Array.isArray(tc.args.questions)
+            ? (tc.args.questions as OptionQuestion[])
+            : undefined
+          if (questions && questions.length > 0) {
+            return <QuestionnaireBlock key={tc.id} questions={questions} onSend={onSend} />
+          }
           return (
             <OptionsBlock
               key={tc.id}

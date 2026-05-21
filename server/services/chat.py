@@ -511,8 +511,9 @@ async def stream_response(
                                     "args": dict(part.function_call.args) if part.function_call.args else {},
                                 }
                                 collected_tool_calls.append(tc_data)
+                                option_args = tc_data.get("args", {})
                                 is_options_tool = tc_data["name"] == "present_options" and bool(
-                                    tc_data.get("args", {}).get("options"),
+                                    option_args.get("options") or option_args.get("questions"),
                                 )
                                 part_type = "options" if is_options_tool else "tool_call"
                                 collected_parts.append({"type": part_type, "toolCall": tc_data})

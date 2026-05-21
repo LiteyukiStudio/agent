@@ -4,6 +4,7 @@ from google.adk.agents.llm_agent import Agent
 
 from model_config import get_model
 from root_agent.callbacks import on_tool_error
+from root_agent.global_tools import all_tools as global_tools
 
 from .tools import all_tools
 
@@ -53,5 +54,5 @@ search_agent = Agent(
 - **关键词策略**：如果第一次搜索效果不好，换关键词重试一次
 - **语言匹配**：用户用中文提问时，搜索关键词可以同时尝试中英文
 """,
-    tools=all_tools,
+    tools=[*global_tools, *all_tools],
 )

@@ -25,6 +25,27 @@ interface ApiMessage {
   created_at: string
 }
 
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => {
+      const result = reader.result
+      if (typeof result !== 'string') {
+        reject(new Error(`Failed to read file: ${file.name}`))
+        return
+      }
+      const commaIndex = result.indexOf(',')
+      if (commaIndex < 0) {
+        reject(new Error(`Invalid data URL format (missing comma): ${file.name}`))
+        return
+      }
+      resolve(result.slice(commaIndex + 1))
+    }
+    reader.onerror = () => reject(reader.error || new Error(`Failed to read file: ${file.name}`))
+    reader.readAsDataURL(file)
+  })
+}
+
 function parseTitleToolResult(result: unknown): string | null {
   if (typeof result !== 'string')
     return null
@@ -90,7 +111,7 @@ function parseApiMessages(data: ApiMessage[]): Message[] {
           }))
 
           for (const tc of toolCalls) {
-            if (tc.name === 'present_options' && tc.args.options) {
+            if (tc.name === 'present_options' && (tc.args.options || tc.args.questions)) {
               parts.push({ type: 'options', toolCall: tc })
             }
             else {
@@ -300,16 +321,10 @@ export function useChat() {
     // 将 File[] 转为 base64 编码的附件数组
     let imageData: Array<{ data: string, mime_type: string }> | undefined
     if (images && images.length > 0) {
-      imageData = await Promise.all(images.map(async (file) => {
-        const buffer = await file.arrayBuffer()
-        const bytes = new Uint8Array(buffer)
-        let binary = ''
-        for (let i = 0; i < bytes.length; i++) {
-          binary += String.fromCharCode(bytes[i])
-        }
-        const base64 = btoa(binary)
-        return { data: base64, mime_type: file.type || 'image/png' }
-      }))
+      imageData = await Promise.all(images.map(async file => ({
+        data: await fileToBase64(file),
+        mime_type: file.type || 'image/png',
+      })))
     }
 
     const userMsg: Message = {
@@ -411,7 +426,7 @@ export function useChat() {
           }
           toolCalls.push(tc)
           // 插入到 parts 中对应位置
-          const isOptions = tc.name === 'present_options' && tc.args.options
+          const isOptions = tc.name === 'present_options' && (tc.args.options || tc.args.questions)
           parts.push({ type: isOptions ? 'options' : 'tool_call', toolCall: tc })
           updateAssistantMsg(assistantContent || 'Calling tools...')
         }
