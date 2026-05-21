@@ -226,7 +226,7 @@ async function handleRequest(request: ToolRequest): Promise<void> {
   const isSessionApproved = !!chatSessionId && alwaysApproveChatSessionIds.has(chatSessionId);
   const isApproved = autoApprove || sessionAlwaysApprove || isSessionApproved;
 
-  // Check if dangerous — skip confirmation if autoApprove or sessionAlwaysApprove is on
+  // Check if dangerous — skip confirmation when current request is already approved.
   if (
     !isApproved &&
     request.tool === "run_command" &&
