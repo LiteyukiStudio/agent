@@ -224,12 +224,11 @@ async function handleRequest(request: ToolRequest): Promise<void> {
   const isSudoCommand = request.tool === "run_command" && needsSudo(command);
   const chatSessionId = getChatSessionId(request);
   const isSessionApproved = !!chatSessionId && alwaysApproveChatSessionIds.has(chatSessionId);
+  const isApproved = autoApprove || sessionAlwaysApprove || isSessionApproved;
 
   // Check if dangerous — skip confirmation if autoApprove or sessionAlwaysApprove is on
   if (
-    !autoApprove &&
-    !sessionAlwaysApprove &&
-    !isSessionApproved &&
+    !isApproved &&
     request.tool === "run_command" &&
     isDangerous(command)
   ) {
@@ -243,6 +242,7 @@ async function handleRequest(request: ToolRequest): Promise<void> {
       if (chatSessionId) {
         alwaysApproveChatSessionIds.add(chatSessionId);
       } else {
+        // 兼容未携带 __chat_session_id 的旧请求：仍在当前连接会话内放行。
         sessionAlwaysApprove = true;
       }
       if (result.password) {
