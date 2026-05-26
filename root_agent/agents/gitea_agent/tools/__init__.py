@@ -2,6 +2,7 @@ from .admin import all_tools as admin_tools
 from .issue import all_tools as issue_tools
 from .miscellaneous import all_tools as misc_tools
 from .notification import all_tools as notification_tools
+from .openapi import all_tools as openapi_tools
 from .organization import all_tools as org_tools
 from .package import all_tools as package_tools
 from .repository import all_tools as repo_tools
@@ -15,6 +16,7 @@ all_tools = [
     *admin_tools,
     *misc_tools,
     *notification_tools,
+    *openapi_tools,
     *org_tools,
     *package_tools,
     *issue_tools,

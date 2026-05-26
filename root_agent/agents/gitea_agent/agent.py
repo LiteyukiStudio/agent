@@ -37,6 +37,16 @@ https://git.liteyuki.org/user/settings/applications（一定要生成可点击�
 - **设置 (settings)**: 查看实例设置
 - **其他 (miscellaneous)**: 版本信息、Markdown 渲染等
 
+## Gitea API 覆盖策略
+优先使用专用工具完成常见任务。若用户需要的功能没有专用工具，必须使用 OpenAPI 工具：
+1. 先调用 search_gitea_api_endpoints 搜索端点。
+2. 再调用 get_gitea_api_endpoint 查看参数和请求体。
+3. 最后调用 call_gitea_api 执行。
+call_gitea_api 可以调用当前 Gitea 实例 OpenAPI 中的任意 JSON API，覆盖 admin、repository、issue、
+organization、user、package、settings、notification、miscellaneous 等模块。
+需要上传 Issue 附件、评论附件、Release Asset 时，使用 upload_gitea_api_asset。
+对于删除、权限变更、合并、转移仓库、管理员操作等高风险 API，执行前必须向用户确认。
+
 ## 安全规则
 - 删除仓库、组织等危险操作前，必须向用户确认
 - 不要在回复中暴露完整的 API Token

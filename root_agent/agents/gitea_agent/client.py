@@ -54,34 +54,56 @@ class GiteaClient:
     # 核心 HTTP 方法
     # ------------------------------------------------------------------
 
+    def request(
+        self,
+        method: str,
+        path: str,
+        params: dict | None = None,
+        json_data: dict | list | None = None,
+    ) -> Any:
+        return self._request(method.upper(), path, params=params, json_data=json_data)
+
+    def multipart(
+        self,
+        method: str,
+        path: str,
+        params: dict | None = None,
+        data: dict | None = None,
+        files: dict | None = None,
+    ) -> Any:
+        return self._request_multipart(method.upper(), path, params=params, data=data, files=files)
+
     def get(self, path: str, params: dict | None = None) -> Any:
         return self._request("GET", path, params=params)
 
-    def post(self, path: str, json_data: dict | None = None) -> Any:
+    def post(self, path: str, json_data: dict | list | None = None) -> Any:
         return self._request("POST", path, json_data=json_data)
 
-    def put(self, path: str, json_data: dict | None = None) -> Any:
+    def put(self, path: str, json_data: dict | list | None = None) -> Any:
         return self._request("PUT", path, json_data=json_data)
 
-    def patch(self, path: str, json_data: dict | None = None) -> Any:
+    def patch(self, path: str, json_data: dict | list | None = None) -> Any:
         return self._request("PATCH", path, json_data=json_data)
 
-    def delete(self, path: str) -> Any:
-        return self._request("DELETE", path)
+    def delete(self, path: str, params: dict | None = None, json_data: dict | list | None = None) -> Any:
+        return self._request("DELETE", path, params=params, json_data=json_data)
 
     def _request(
         self,
         method: str,
         path: str,
         params: dict | None = None,
-        json_data: dict | None = None,
+        json_data: dict | list | None = None,
     ) -> Any:
         try:
-            resp = self._client.request(method, path, params=params, json=json_data)
+            resp = self._client.request(
+                method,
+                path,
+                params=params,
+                json=json_data,
+            )
             resp.raise_for_status()
-            if resp.status_code == 204:
-                return {"status": "ok", "code": 204}
-            return resp.json()
+            return self._parse_response(resp)
         except httpx.HTTPStatusError as e:
             return {
                 "error": True,
@@ -90,6 +112,41 @@ class GiteaClient:
             }
         except httpx.RequestError as e:
             return {"error": True, "message": str(e)}
+
+    def _request_multipart(
+        self,
+        method: str,
+        path: str,
+        params: dict | None = None,
+        data: dict | None = None,
+        files: dict | None = None,
+    ) -> Any:
+        try:
+            resp = self._client.request(method, path, params=params, data=data, files=files)
+            resp.raise_for_status()
+            return self._parse_response(resp)
+        except httpx.HTTPStatusError as e:
+            return {
+                "error": True,
+                "status_code": e.response.status_code,
+                "message": e.response.text[:500],
+            }
+        except httpx.RequestError as e:
+            return {"error": True, "message": str(e)}
+
+    def _parse_response(self, resp: httpx.Response) -> Any:
+        if resp.status_code == 204:
+            return {"status": "ok", "code": 204}
+        content_type = resp.headers.get("content-type", "")
+        if "application/json" in content_type:
+            return resp.json()
+        return {
+            "status": "ok",
+            "code": resp.status_code,
+            "content_type": content_type,
+            "text": resp.text[:50000],
+            "truncated": len(resp.text) > 50000,
+        }
 
     # ------------------------------------------------------------------
     # 生命周期
