@@ -22,7 +22,7 @@ export function ChatPage() {
     sendMessage,
     stopGeneration,
     togglePublic,
-  } = useChat()
+  } = useChat(sessionId)
   const [mobileOpen, setMobileOpen] = useState(false)
 
   useTitle(activeSession?.title || 'Chat')
@@ -42,6 +42,7 @@ export function ChatPage() {
   }, [sessionId, sessions.length]) // eslint-disable-line react/exhaustive-deps
 
   function handleSelectSession(id: string) {
+    setActiveSession(id)
     navigate(`/session/${id}`)
     setMobileOpen(false)
   }
