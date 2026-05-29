@@ -137,10 +137,10 @@ function parseApiMessages(data: ApiMessage[]): Message[] {
   })
 }
 
-export function useChat() {
+export function useChat(routeSessionId?: string) {
   const { user } = useAuth()
   const [sessions, setSessions] = useState<Session[]>([])
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null)
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => routeSessionId ?? null)
   const [loadingSessionIds, setLoadingSessionIds] = useState<Set<string>>(() => new Set())
   const [messagesBySession, setMessagesBySession] = useState<Record<string, Message[]>>({})
   const abortRef = useRef<Record<string, AbortController>>({})
@@ -162,12 +162,9 @@ export function useChat() {
           messages: [],
         }))
         setSessions(mapped)
-        if (mapped.length > 0 && !activeSessionId) {
-          setActiveSessionId(mapped[0].id)
-        }
+        setActiveSessionId(prev => prev ?? mapped[0]?.id ?? null)
       })
       .catch(() => { /* auth guard handles redirect */ })
-  // eslint-disable-next-line react/exhaustive-deps
   }, [user])
 
   // 加载会话消息（切换会话时）
