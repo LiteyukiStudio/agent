@@ -7,7 +7,7 @@
  * Device Code：CLI 获取验证码 → 用户手动打开 URL 输入验证码 → CLI 轮询
  */
 import { createServer } from "node:http";
-import { exec, execSync } from "node:child_process";
+import { execSync, spawn } from "node:child_process";
 import { hostname as osHostname, release } from "node:os";
 import { platform } from "node:os";
 import { URL } from "node:url";
@@ -91,13 +91,12 @@ export function getOsType(): string {
 }
 
 function openBrowser(url: string): void {
-  const cmd =
-    platform() === "darwin"
-      ? `open "${url}"`
-      : platform() === "win32"
-        ? `start "${url}"`
-        : `xdg-open "${url}"`;
-  exec(cmd, () => {});
+  const child = platform() === "darwin"
+    ? spawn("open", [url], { detached: true, stdio: "ignore" })
+    : platform() === "win32"
+      ? spawn("cmd", ["/c", "start", "", url], { detached: true, stdio: "ignore" })
+      : spawn("xdg-open", [url], { detached: true, stdio: "ignore" });
+  child.unref();
 }
 
 export interface LoginResult {

@@ -303,6 +303,8 @@ async def local_agent_websocket(
                         "args": response.get("args", {}),
                         "device_id": device_id,
                         "device_name": device_name,
+                        "needs_password": bool(response.get("needs_password")),
+                        "sudo_public_key": response.get("sudo_public_key"),
                         "timestamp": __import__("time").time(),
                     }
                     logger.info("Confirm request from device=%s: %s %s", device_name, response.get("tool"), req_id[:8])
@@ -322,6 +324,11 @@ async def local_agent_websocket(
             del _connections[user_id][device_id]
             if not _connections[user_id]:
                 del _connections[user_id]
+        confirms = _confirmations.get(user_id, {})
+        for req_id in [k for k, v in confirms.items() if v.get("device_id") == device_id]:
+            confirms.pop(req_id, None)
+        if not confirms:
+            _confirmations.pop(user_id, None)
         for future in _pending.pop(user_id, {}).values():
             if not future.done():
                 future.cancel()
@@ -456,6 +463,8 @@ async def approve_confirmation(
     device = _connections.get(user.id, {}).get(device_id)
     if device:
         msg: dict = {"type": "confirm_response", "id": request_id, "approved": True}
+        if body and body.get("encrypted_password"):
+            msg["encrypted_password"] = body["encrypted_password"]
         if body and body.get("password"):
             msg["password"] = body["password"]
         await device.ws.send_json(msg)
@@ -478,6 +487,8 @@ async def always_approve_confirmation(
     device = _connections.get(user.id, {}).get(device_id)
     if device:
         msg: dict = {"type": "confirm_response", "id": request_id, "approved": True, "always": True}
+        if body and body.get("encrypted_password"):
+            msg["encrypted_password"] = body["encrypted_password"]
         if body and body.get("password"):
             msg["password"] = body["password"]
         await device.ws.send_json(msg)

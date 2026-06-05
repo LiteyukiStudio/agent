@@ -1,7 +1,8 @@
 /**
  * 本地工具执行器：在用户电脑上执行云端下发的操作
  */
-import { execSync } from "node:child_process";
+import { spawn } from "node:child_process";
+import { constants, privateDecrypt } from "node:crypto";
 import { readFileSync, writeFileSync, readdirSync, statSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { homedir } from "node:os";
@@ -16,6 +17,15 @@ export interface ToolResponse {
   id: string;
   result?: string;
   error?: string;
+}
+
+interface CommandResult {
+  exitCode: number | null;
+  stdout: string;
+  stderr: string;
+  timedOut: boolean;
+  durationMs: number;
+  truncated: boolean;
 }
 
 /** 需要用户确认的高危操作 */
@@ -58,55 +68,191 @@ const DANGEROUS_PATTERNS = [
   // ---- 危险重定向 ----
   />\s*\/etc\//,                          // 写 /etc 配置
   />\s*~\//,                              // 覆盖 home 目录文件
+  // ---- 敏感凭据路径 ----
+  /(?:^|\s)(?:~\/|\/[^\s]+\/)?\.ssh(?:\/|\s|$)/i,
+  /(?:^|\s)(?:~\/|\/[^\s]+\/)?\.gnupg(?:\/|\s|$)/i,
+  /(?:^|\s)(?:~\/|\/[^\s]+\/)?\.aws(?:\/|\s|$)/i,
+  /(?:^|\s)(?:~\/|\/[^\s]+\/)?\.kube(?:\/|\s|$)/i,
+  /(?:^|\s)(?:~\/|\/[^\s]+\/)?\.docker(?:\/|\s|$)/i,
+  /(?:^|\s)(?:~\/|\/[^\s]+\/)?\.env(?:\.[^\s]+)?(?:\s|$)/i,
+  /(?:^|\s)(?:~\/|\/[^\s]+\/)?(?:id_rsa|id_ed25519)(?:\s|$)/i,
 ];
 
 export function isDangerous(command: string): boolean {
   return DANGEROUS_PATTERNS.some((p) => p.test(command));
 }
 
+const SENSITIVE_PATH_PATTERNS = [
+  /^\/etc(?:\/|$)/,
+  /^\/var(?:\/|$)/,
+  /^\/usr(?:\/|$)/,
+  /^\/bin(?:\/|$)/,
+  /^\/sbin(?:\/|$)/,
+  /^\/System(?:\/|$)/,
+  /^\/Library(?:\/|$)/,
+  /(?:^|\/)\.ssh(?:\/|$)/,
+  /(?:^|\/)\.gnupg(?:\/|$)/,
+  /(?:^|\/)\.aws(?:\/|$)/,
+  /(?:^|\/)\.kube(?:\/|$)/,
+  /(?:^|\/)\.docker(?:\/|$)/,
+  /(?:^|\/)\.config\/gh(?:\/|$)/,
+  /(?:^|\/)\.config\/liteyuki-local-agent(?:\/|$)/,
+  /(?:^|\/)(?:\.env|\.env\..*|id_rsa|id_ed25519|known_hosts)$/,
+];
+
+export function isSensitivePath(path: string): boolean {
+  const expanded = expandPath(path);
+  return SENSITIVE_PATH_PATTERNS.some((pattern) => pattern.test(expanded));
+}
+
 /** 将路径中的 ~ 展开为 home 目录 */
-function expandPath(p: string): string {
+export function expandPath(p: string): string {
   if (p.startsWith("~/") || p === "~") {
     return join(homedir(), p.slice(1));
   }
   return resolve(p);
 }
 
-export function executeTool(request: ToolRequest): ToolResponse {
+function formatCommandResult(result: CommandResult): string {
+  const lines = [
+    `exit_code: ${result.exitCode ?? "signal"}`,
+    `duration_ms: ${result.durationMs}`,
+    `timed_out: ${result.timedOut}`,
+    `truncated: ${result.truncated}`,
+  ];
+  if (result.stdout) {
+    lines.push("", "stdout:", result.stdout);
+  }
+  if (result.stderr) {
+    lines.push("", "stderr:", result.stderr);
+  }
+  return lines.join("\n").slice(0, 100000);
+}
+
+function runCommand(cmd: string, options: {
+  cwd: string;
+  timeout: number;
+  input?: string;
+  maxBuffer?: number;
+}): Promise<CommandResult> {
+  return new Promise((resolveCommand) => {
+    const startedAt = Date.now();
+    const maxBuffer = options.maxBuffer ?? 4 * 1024 * 1024;
+    let stdout = "";
+    let stderr = "";
+    let truncated = false;
+    let timedOut = false;
+
+    const child = spawn(cmd, {
+      cwd: options.cwd,
+      shell: true,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    const append = (kind: "stdout" | "stderr", chunk: Buffer) => {
+      const text = chunk.toString("utf-8");
+      const currentSize = Buffer.byteLength(stdout) + Buffer.byteLength(stderr);
+      const remaining = maxBuffer - currentSize;
+      if (remaining <= 0) {
+        truncated = true;
+        return;
+      }
+      const next = Buffer.byteLength(text) > remaining ? text.slice(0, remaining) : text;
+      if (next.length < text.length) truncated = true;
+      if (kind === "stdout") stdout += next;
+      else stderr += next;
+    };
+
+    const timer = setTimeout(() => {
+      timedOut = true;
+      child.kill("SIGTERM");
+      setTimeout(() => {
+        child.kill("SIGKILL");
+      }, 2000).unref();
+    }, options.timeout);
+
+    child.stdout?.on("data", (chunk: Buffer) => append("stdout", chunk));
+    child.stderr?.on("data", (chunk: Buffer) => append("stderr", chunk));
+    child.on("error", (err) => {
+      clearTimeout(timer);
+      resolveCommand({
+        exitCode: null,
+        stdout,
+        stderr: stderr ? `${stderr}\n${err.message}` : err.message,
+        timedOut,
+        durationMs: Date.now() - startedAt,
+        truncated,
+      });
+    });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      resolveCommand({
+        exitCode: code,
+        stdout,
+        stderr,
+        timedOut,
+        durationMs: Date.now() - startedAt,
+        truncated,
+      });
+    });
+
+    if (options.input) {
+      child.stdin?.write(options.input);
+    }
+    child.stdin?.end();
+  });
+}
+
+export async function executeTool(request: ToolRequest): Promise<ToolResponse> {
   const { id, tool, args } = request;
 
   try {
     switch (tool) {
       case "run_command": {
         const cmd = args.command as string;
+        if (typeof cmd !== "string" || !cmd.trim()) {
+          return { id, error: "run_command requires a non-empty string command" };
+        }
         const cwd = args.cwd
           ? expandPath(args.cwd as string)
           : process.cwd();
-        const timeout = (args.timeout as number) || 30000;
-        const output = execSync(cmd, {
+        const timeout = Math.min(Math.max((args.timeout as number) || 60000, 1000), 10 * 60 * 1000);
+        const result = await runCommand(cmd, {
           cwd,
           timeout,
-          encoding: "utf-8",
-          maxBuffer: 1024 * 1024,
-          stdio: ["pipe", "pipe", "pipe"],
         });
-        return { id, result: output.slice(0, 50000) };
+        const output = formatCommandResult(result);
+        return result.exitCode === 0 && !result.timedOut
+          ? { id, result: output }
+          : { id, error: output };
       }
 
       case "read_file": {
-        const path = expandPath(args.path as string);
+        if (typeof args.path !== "string" || !args.path) {
+          return { id, error: "read_file requires a string path" };
+        }
+        const path = expandPath(args.path);
         const content = readFileSync(path, "utf-8");
         return { id, result: content.slice(0, 100000) };
       }
 
       case "write_file": {
-        const path = expandPath(args.path as string);
+        if (typeof args.path !== "string" || !args.path) {
+          return { id, error: "write_file requires a string path" };
+        }
         const content = args.content as string;
+        if (typeof content !== "string") {
+          return { id, error: "write_file requires string content" };
+        }
+        const path = expandPath(args.path);
         writeFileSync(path, content, "utf-8");
         return { id, result: `Written ${content.length} bytes to ${path}` };
       }
 
       case "list_files": {
+        if (args.path !== undefined && typeof args.path !== "string") {
+          return { id, error: "list_files path must be a string when provided" };
+        }
         const dir = expandPath((args.path as string) || ".");
         const entries = readdirSync(dir).map((name) => {
           const fullPath = join(dir, name);
@@ -137,26 +283,37 @@ export function executeTool(request: ToolRequest): ToolResponse {
  * 用 sudo -S 执行命令（通过 stdin 传入密码，密码不会出现在进程列表中）。
  * 密码仅在内存中使用，绝不写盘/不打日志。
  */
-export function executeSudoTool(request: ToolRequest, password: string): ToolResponse {
+export async function executeSudoTool(request: ToolRequest, password: string): Promise<ToolResponse> {
   const { id, args } = request;
   const cmd = args.command as string;
   const cwd = args.cwd ? expandPath(args.cwd as string) : process.cwd();
-  const timeout = (args.timeout as number) || 30000;
+  const timeout = Math.min(Math.max((args.timeout as number) || 60000, 1000), 10 * 60 * 1000);
 
   try {
     // 将 sudo 替换为 sudo -S（从 stdin 读密码），避免终端交互
-    const sudoCmd = cmd.replace(/\bsudo\b/, "sudo -S");
-    const output = execSync(sudoCmd, {
+    const sudoCmd = cmd.replace(/\bsudo(?!\s+-S)\b/, "sudo -S -p ''");
+    const result = await runCommand(sudoCmd, {
       cwd,
       timeout,
-      encoding: "utf-8",
-      maxBuffer: 1024 * 1024,
       input: password + "\n",  // 通过 stdin 传密码
-      stdio: ["pipe", "pipe", "pipe"],
     });
-    return { id, result: output.slice(0, 50000) };
+    const output = formatCommandResult(result);
+    return result.exitCode === 0 && !result.timedOut
+      ? { id, result: output }
+      : { id, error: output };
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     return { id, error: msg.slice(0, 5000) };
   }
+}
+
+export function decryptPassword(encryptedPassword: string, privateKeyPem: string): string {
+  return privateDecrypt(
+    {
+      key: privateKeyPem,
+      padding: constants.RSA_PKCS1_OAEP_PADDING,
+      oaepHash: "sha256",
+    },
+    Buffer.from(encryptedPassword, "base64"),
+  ).toString("utf-8");
 }

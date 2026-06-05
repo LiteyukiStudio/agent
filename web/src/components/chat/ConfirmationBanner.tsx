@@ -11,7 +11,51 @@ interface Confirmation {
   device_id: string
   device_name: string
   needs_password?: boolean
+  sudo_public_key?: string
   timestamp: number
+}
+
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  const base64 = pem
+    .replace(/-----BEGIN PUBLIC KEY-----/g, '')
+    .replace(/-----END PUBLIC KEY-----/g, '')
+    .replace(/\s/g, '')
+  const binary = atob(base64)
+  const bytes = new Uint8Array(binary.length)
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i)
+  }
+  return bytes.buffer
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = ''
+  const chunkSize = 0x8000
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.slice(i, i + chunkSize))
+  }
+  return btoa(binary)
+}
+
+async function encryptPassword(password: string, publicKeyPem?: string): Promise<Record<string, string>> {
+  if (!password)
+    return {}
+  if (!publicKeyPem || !crypto.subtle)
+    return { password }
+
+  const key = await crypto.subtle.importKey(
+    'spki',
+    pemToArrayBuffer(publicKeyPem),
+    { name: 'RSA-OAEP', hash: 'SHA-256' },
+    false,
+    ['encrypt'],
+  )
+  const encrypted = await crypto.subtle.encrypt(
+    { name: 'RSA-OAEP' },
+    key,
+    new TextEncoder().encode(password),
+  )
+  return { encrypted_password: bytesToBase64(new Uint8Array(encrypted)) }
 }
 
 function ConfirmCard({ confirmation: c, onDone }: { confirmation: Confirmation, onDone: () => void }) {
@@ -25,13 +69,13 @@ function ConfirmCard({ confirmation: c, onDone }: { confirmation: Confirmation, 
   }, [c.needs_password])
 
   async function handleApprove() {
-    const body = password ? { password } : {}
+    const body = await encryptPassword(password, c.sudo_public_key)
     await apiPost(`/api/v1/local-agent/confirmations/${c.id}/approve`, body)
     onDone()
   }
 
   async function handleAlwaysApprove() {
-    const body = password ? { password } : {}
+    const body = await encryptPassword(password, c.sudo_public_key)
     await apiPost(`/api/v1/local-agent/confirmations/${c.id}/always`, body)
     onDone()
   }

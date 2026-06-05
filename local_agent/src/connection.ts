@@ -2,7 +2,9 @@
  * WebSocket 客户端：反向连接云端，接收并执行指令
  */
 import WebSocket from "ws";
-import { executeSudoTool, executeTool, isDangerous } from "./tools.js";
+import { generateKeyPairSync } from "node:crypto";
+import { getConfig } from "./config.js";
+import { decryptPassword, executeSudoTool, executeTool, isDangerous, isSensitivePath } from "./tools.js";
 import { t } from "./i18n/index.js";
 import type { ToolRequest, ToolResponse } from "./tools.js";
 
@@ -26,6 +28,7 @@ let currentUrl = "";
 let currentToken = "";
 let events: ConnectionEvents | null = null;
 let autoApprove = false;
+const SUDO_PASSWORD_TTL_MS = 5 * 60 * 1000;
 
 export function setAutoApprove(value: boolean): void {
   autoApprove = value;
@@ -47,6 +50,18 @@ export function getStatus(): ConnectionStatus {
   }
 }
 
+function isToolRequest(value: unknown): value is ToolRequest {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<ToolRequest>;
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.tool === "string" &&
+    !!candidate.args &&
+    typeof candidate.args === "object" &&
+    !Array.isArray(candidate.args)
+  );
+}
+
 export function connect(url: string, token: string): void {
   currentUrl = url;
   currentToken = token;
@@ -56,6 +71,7 @@ export function connect(url: string, token: string): void {
 
 export function disconnect(): void {
   shouldReconnect = false;
+  resetSessionApprovals();
   if (reconnectTimer) {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
@@ -101,12 +117,13 @@ function doConnect(): void {
       }
       // 服务端转发的确认响应（Web 前端审批结果）
       if (msg.type === "confirm_response") {
-        handleConfirmResponse(msg.id, msg.approved, msg.always, msg.password);
+        handleConfirmResponse(msg.id, msg.approved, msg.always, msg.password, msg.encrypted_password);
         return;
       }
-      const request = msg as ToolRequest;
+      if (!isToolRequest(msg)) return;
+      const request = msg;
       events?.onRequest(request);
-      handleRequest(request);
+      void handleRequest(request);
     } catch (err) {
       // ignore malformed messages
     }
@@ -116,8 +133,10 @@ function doConnect(): void {
     ws = null;
     if (pingTimer) { clearInterval(pingTimer); pingTimer = null; }
 
-    // 被同设备新连接踢出 (4002) 或被用户移除 (4003)：停止重连
-    if (code === 4002 || code === 4003) {
+    resetSessionApprovals();
+
+    // Token 无效 (4001)、被同设备新连接踢出 (4002) 或被用户移除 (4003)：停止重连
+    if (code === 4001 || code === 4002 || code === 4003) {
       shouldReconnect = false;
       const reasonStr = reason?.toString() || "Kicked by another session";
       events?.onStatusChange("disconnected", `⚠ ${reasonStr}. ${t.connection.kicked}`);
@@ -153,26 +172,74 @@ interface ConfirmResult {
 const pendingConfirms: Map<string, {
   resolve: (result: ConfirmResult) => void;
   timer: ReturnType<typeof setTimeout>;
+  privateKeyPem?: string;
 }> = new Map();
 
-// 本次会话是否已启用「始终允许」模式（连接断开后重置）
-let sessionAlwaysApprove = false;
+// 本次连接中用户选择「始终允许」的操作指纹（连接断开后重置）
+const approvedFingerprints = new Set<string>();
 
-// 本次会话缓存的 sudo 密码（连接断开后清空，绝不写盘）
+// 短期缓存的 sudo 密码（连接断开/过期后清空，绝不写盘）
 let cachedSudoPassword: string | null = null;
+let cachedSudoPasswordTimer: ReturnType<typeof setTimeout> | null = null;
+
+function clearSudoPassword(): void {
+  cachedSudoPassword = null;
+  if (cachedSudoPasswordTimer) {
+    clearTimeout(cachedSudoPasswordTimer);
+    cachedSudoPasswordTimer = null;
+  }
+}
+
+function rememberSudoPassword(password: string): void {
+  cachedSudoPassword = password;
+  if (cachedSudoPasswordTimer) clearTimeout(cachedSudoPasswordTimer);
+  cachedSudoPasswordTimer = setTimeout(() => {
+    cachedSudoPassword = null;
+    cachedSudoPasswordTimer = null;
+  }, SUDO_PASSWORD_TTL_MS);
+}
+
+function resetSessionApprovals(): void {
+  approvedFingerprints.clear();
+  clearSudoPassword();
+  for (const [id, pending] of pendingConfirms) {
+    clearTimeout(pending.timer);
+    pending.resolve({ action: "reject" });
+    pendingConfirms.delete(id);
+  }
+}
+
+function requestFingerprint(request: ToolRequest): string {
+  return JSON.stringify({ tool: request.tool, args: request.args });
+}
 
 /** 处理服务端发来的确认响应 */
-export function handleConfirmResponse(id: string, approved: boolean, always?: boolean, password?: string): void {
+export function handleConfirmResponse(
+  id: string,
+  approved: boolean,
+  always?: boolean,
+  password?: string,
+  encryptedPassword?: string,
+): void {
   const pending = pendingConfirms.get(id);
   if (pending) {
     clearTimeout(pending.timer);
     pendingConfirms.delete(id);
+    let resolvedPassword = password;
+    if (!resolvedPassword && encryptedPassword && pending.privateKeyPem) {
+      try {
+        resolvedPassword = decryptPassword(encryptedPassword, pending.privateKeyPem);
+      } catch {
+        pending.resolve({ action: "reject" });
+        return;
+      }
+    }
     if (!approved) {
       pending.resolve({ action: "reject" });
     } else if (always) {
-      pending.resolve({ action: "always", password });
+      pending.resolve({ action: "always", password: resolvedPassword });
     } else {
-      pending.resolve({ action: "approve", password });
+      pending.resolve({ action: "approve", password: resolvedPassword });
     }
   }
 }
@@ -180,6 +247,17 @@ export function handleConfirmResponse(id: string, approved: boolean, always?: bo
 /** 通过 Web 前端请求用户审批（可带密码输入） */
 function requestWebConfirmation(request: ToolRequest, needsPassword: boolean = false): Promise<ConfirmResult> {
   return new Promise((resolve) => {
+    let privateKeyPem: string | undefined;
+    let publicKeyPem: string | undefined;
+    if (needsPassword) {
+      const pair = generateKeyPairSync("rsa", {
+        modulusLength: 2048,
+        publicKeyEncoding: { type: "spki", format: "pem" },
+        privateKeyEncoding: { type: "pkcs8", format: "pem" },
+      });
+      privateKeyPem = pair.privateKey;
+      publicKeyPem = pair.publicKey;
+    }
     // 发送确认请求到服务端，由 Web 前端展示
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({
@@ -188,14 +266,18 @@ function requestWebConfirmation(request: ToolRequest, needsPassword: boolean = f
         tool: request.tool,
         args: request.args,
         needs_password: needsPassword,
+        sudo_public_key: publicKeyPem,
       }));
+    } else {
+      resolve({ action: "reject" });
+      return;
     }
     // 超时 120 秒自动拒绝
     const timer = setTimeout(() => {
       pendingConfirms.delete(request.id);
       resolve({ action: "reject" });
     }, 120000);
-    pendingConfirms.set(request.id, { resolve, timer });
+    pendingConfirms.set(request.id, { resolve, timer, privateKeyPem });
   });
 }
 
@@ -204,16 +286,53 @@ function needsSudo(command: string): boolean {
   return /\bsudo\b/i.test(command);
 }
 
+function getRequestPath(request: ToolRequest): string | null {
+  const value = request.args.path;
+  return typeof value === "string" ? value : null;
+}
+
+function requiresConfirmation(request: ToolRequest): boolean {
+  if (request.tool === "run_command") {
+    const command = typeof request.args.command === "string" ? request.args.command : "";
+    return isDangerous(command);
+  }
+  if (request.tool === "write_file") {
+    return true;
+  }
+  if (request.tool === "read_file" || request.tool === "list_files") {
+    const path = getRequestPath(request);
+    return !!path && isSensitivePath(path);
+  }
+  return false;
+}
+
+function isToolAllowed(tool: string): boolean {
+  const allowedTools = getConfig().allowedTools;
+  return allowedTools.includes(tool);
+}
+
 async function handleRequest(request: ToolRequest): Promise<void> {
+  if (!isToolAllowed(request.tool)) {
+    const response: ToolResponse = {
+      id: request.id,
+      error: `Tool not allowed by local agent config: ${request.tool}`,
+    };
+    sendResponse(response);
+    events?.onResponse(response);
+    return;
+  }
+
   const command = typeof request.args.command === "string" ? request.args.command : "";
   const isSudoCommand = request.tool === "run_command" && needsSudo(command);
+  const fingerprint = requestFingerprint(request);
+  const hasApprovedFingerprint = approvedFingerprints.has(fingerprint);
+  const shouldConfirm = requiresConfirmation(request);
 
-  // Check if dangerous — skip confirmation if autoApprove or sessionAlwaysApprove is on
+  // Check if the operation needs confirmation. sudo without a cached password still asks for
+  // a password even when auto-approve is enabled, because the agent cannot run it unattended.
   if (
-    !autoApprove &&
-    !sessionAlwaysApprove &&
-    request.tool === "run_command" &&
-    isDangerous(command)
+    (!autoApprove && !hasApprovedFingerprint && shouldConfirm) ||
+    (isSudoCommand && !cachedSudoPassword)
   ) {
     // sudo 命令：如果没有缓存密码则需要密码
     const requirePassword = isSudoCommand && !cachedSudoPassword;
@@ -221,15 +340,15 @@ async function handleRequest(request: ToolRequest): Promise<void> {
     // 通过 Web 前端请求审批
     const result = await requestWebConfirmation(request, requirePassword);
     if (result.action === "always") {
-      // 「始终允许」：本次会话后续所有命令都跳过确认
-      sessionAlwaysApprove = true;
+      // 「始终允许」：本次连接后续相同操作跳过确认
+      approvedFingerprints.add(fingerprint);
       if (result.password) {
-        cachedSudoPassword = result.password;
+        rememberSudoPassword(result.password);
       }
     } else if (result.action === "approve") {
       // 一次性使用密码
       if (result.password && !cachedSudoPassword) {
-        cachedSudoPassword = result.password;
+        rememberSudoPassword(result.password);
       }
     } else {
       const response: ToolResponse = {
@@ -244,15 +363,15 @@ async function handleRequest(request: ToolRequest): Promise<void> {
 
   // 执行命令（如果是 sudo 且有缓存密码，注入密码）
   if (isSudoCommand && cachedSudoPassword) {
-    const response = executeSudoTool(request, cachedSudoPassword);
+    const response = await executeSudoTool(request, cachedSudoPassword);
     // 如果密码错误，清除缓存
-    if (response.error && response.error.includes("incorrect password")) {
-      cachedSudoPassword = null;
+    if (response.error && /incorrect password|try again|sorry/i.test(response.error)) {
+      clearSudoPassword();
     }
     sendResponse(response);
     events?.onResponse(response);
   } else {
-    const response = executeTool(request);
+    const response = await executeTool(request);
     sendResponse(response);
     events?.onResponse(response);
   }
