@@ -82,8 +82,8 @@ function ThinkingBlock({ content }: { content: string }) {
       </button>
       {expanded
         ? (
-            <div className="mt-1 border-l-2 border-muted-foreground/20 pl-3 text-xs text-muted-foreground/60 leading-relaxed max-h-60 overflow-y-auto">
-              <div className="prose prose-sm dark:prose-invert max-w-none opacity-60 [&_p]:my-0.5 [&_p]:text-xs [&_code]:text-[11px]">
+            <div className="mt-1 min-w-0 max-w-full border-l-2 border-muted-foreground/20 pl-3 text-xs text-muted-foreground/60 leading-relaxed max-h-60 overflow-y-auto">
+              <div className="prose prose-sm dark:prose-invert w-full max-w-none opacity-60 whitespace-pre-wrap break-words [overflow-wrap:anywhere] [&_*]:max-w-full [&_p]:my-0.5 [&_p]:text-xs [&_p]:whitespace-pre-wrap [&_code]:text-[11px]">
                 <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{content}</Markdown>
               </div>
             </div>
@@ -91,11 +91,11 @@ function ThinkingBlock({ content }: { content: string }) {
         : (
             <div
               ref={previewRef}
-              className="mt-1 border-l-2 border-muted-foreground/20 pl-3 text-xs text-muted-foreground/50 leading-relaxed max-h-[3.6em] overflow-hidden"
+              className="mt-1 min-w-0 max-w-full border-l-2 border-muted-foreground/20 pl-3 text-xs text-muted-foreground/50 leading-relaxed max-h-[3.6em] overflow-hidden"
             >
               {previewLines.map((line, i) => (
                 // eslint-disable-next-line react/no-array-index-key
-                <div key={i} className="truncate">{line}</div>
+                <div key={i} className="min-w-0 max-w-full truncate">{line}</div>
               ))}
             </div>
           )}
