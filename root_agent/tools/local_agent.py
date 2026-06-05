@@ -113,8 +113,11 @@ async def local_list_files(
 async def _call(tool_context: ToolContext, tool: str, args: dict, device: str = "") -> str:
     """实际调用 local_agent 的内部方法。"""
     user_id = tool_context.state.get("__user_id")
+    chat_session_id = tool_context.state.get("__chat_session_id")
     if not user_id:
         return "错误：无法确定用户身份"
+    if isinstance(chat_session_id, str) and chat_session_id:
+        args = {**args, "__chat_session_id": chat_session_id}
 
     from server.routers.local_agent import (
         _connections,
