@@ -55,10 +55,19 @@ function MarkdownLink({ href, children, ...props }: ComponentPropsWithoutRef<'a'
 
 const markdownComponents = { a: MarkdownLink, code: CodeBlock }
 
+function normalizeThinkingContent(content: string): string {
+  return content
+    .replace(/\r\n?/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{2,}/g, '\n')
+    .trim()
+}
+
 function ThinkingBlock({ content }: { content: string }) {
   const [expanded, setExpanded] = useState(false)
   const previewRef = useRef<HTMLDivElement>(null)
-  const lines = content.split('\n').filter(Boolean)
+  const normalizedContent = normalizeThinkingContent(content)
+  const lines = normalizedContent.split('\n').filter(Boolean)
   const previewLines = lines.slice(-3)
 
   // 自动滚动到最新内容
@@ -83,9 +92,9 @@ function ThinkingBlock({ content }: { content: string }) {
       {expanded
         ? (
             <div className="mt-1 min-w-0 max-w-full border-l-2 border-muted-foreground/20 pl-3 text-xs text-muted-foreground/60 leading-relaxed max-h-60 overflow-y-auto">
-              <div className="prose prose-sm dark:prose-invert w-full max-w-none opacity-60 whitespace-pre-wrap break-words [overflow-wrap:anywhere] [&_*]:max-w-full [&_p]:my-0.5 [&_p]:text-xs [&_p]:whitespace-pre-wrap [&_code]:text-[11px]">
-                <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>{content}</Markdown>
-              </div>
+              <p className="m-0 w-full max-w-none whitespace-pre-wrap break-words [overflow-wrap:anywhere] opacity-60">
+                {normalizedContent}
+              </p>
             </div>
           )
         : (
@@ -283,7 +292,7 @@ function QuestionnaireBlock({ questions, onSend }: { questions: OptionQuestion[]
   return (
     <div className="my-2 space-y-3 max-w-full overflow-hidden">
       {questions.map((q, idx) => (
-        <div key={`question-${idx}`} className="rounded-lg border p-3">
+        <div key={`${q.question}-${q.options.join('|')}`} className="rounded-lg border p-3">
           <p className="mb-2 text-sm font-medium">{t('questionnaireQuestion', { index: idx + 1 })}</p>
           <OptionsBlock
             question={q.question}

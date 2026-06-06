@@ -1,6 +1,6 @@
 import type { KeyboardEvent } from 'react'
 import { ArrowUp, ImagePlus, Square, X } from 'lucide-react'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -21,19 +21,17 @@ export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProp
   const { t: tc } = useTranslation('common')
   const [value, setValue] = useState('')
   const [attachedImages, setAttachedImages] = useState<File[]>([])
-  const [previewUrls, setPreviewUrls] = useState<string[]>([])
+  const previewUrls = useMemo(() => attachedImages.map(file => URL.createObjectURL(file)), [attachedImages])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
-    const urls = attachedImages.map(file => URL.createObjectURL(file))
-    setPreviewUrls(urls)
     return () => {
-      for (const url of urls) {
+      for (const url of previewUrls) {
         URL.revokeObjectURL(url)
       }
     }
-  }, [attachedImages])
+  }, [previewUrls])
 
   const addImages = useCallback((files: File[]) => {
     const validFiles: File[] = []
@@ -116,7 +114,7 @@ export function ChatInput({ onSend, onStop, isLoading, disabled }: ChatInputProp
         {attachedImages.length > 0 && (
           <div className="mb-2 flex flex-wrap gap-2">
             {attachedImages.map((file, i) => (
-              <div key={`${file.name}-${file.lastModified}-${file.size}-${i}`} className="group relative">
+              <div key={`${file.name}-${file.lastModified}-${file.size}`} className="group relative">
                 <img
                   src={previewUrls[i]}
                   alt=""
