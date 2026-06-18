@@ -55,6 +55,14 @@ def _is_gemini(model_name: str) -> bool:
     return model_name.startswith("gemini")
 
 
+def _configure_litellm_transport() -> None:
+    """配置 LiteLLM 传输层，兼容部分 OpenAI-compatible 网关。"""
+    import litellm
+
+    # 部分 OpenAI-compatible 网关与 LiteLLM 的 aiohttp 异步传输路径拼接不兼容。
+    litellm.disable_aiohttp_transport = True
+
+
 def get_model(agent_name: str) -> Any:
     """返回指定 Agent 的模型对象。
 
@@ -83,6 +91,7 @@ def get_model(agent_name: str) -> Any:
     # 非 Gemini 模型通过 LiteLLM 适配器
     from google.adk.models.lite_llm import LiteLlm
 
+    _configure_litellm_transport()
     kwargs: dict[str, str] = {"model": model_name}
     if token:
         kwargs["api_key"] = token

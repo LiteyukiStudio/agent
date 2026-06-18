@@ -10,7 +10,7 @@ import logging
 
 import litellm
 
-from model_config import _is_gemini, _resolve_env
+from model_config import _configure_litellm_transport, _is_gemini, _resolve_env
 
 logger = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ async def generate_title(user_message: str, assistant_reply: str) -> str | None:
                 {"role": "system", "content": _SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
-            "max_tokens": 100,
+            "max_tokens": 512,
             "temperature": 0.3,
         }
         if token:
@@ -65,6 +65,7 @@ async def generate_title(user_message: str, assistant_reply: str) -> str | None:
         if api_url:
             kwargs["api_base"] = api_url
 
+        _configure_litellm_transport()
         response = await litellm.acompletion(**kwargs)
         title = response.choices[0].message.content.strip()
         # 去掉可能的引号和多余标点
